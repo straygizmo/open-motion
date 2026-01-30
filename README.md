@@ -1,7 +1,7 @@
 # OpenMotion
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/anthropics/claude-code/main/assets/claude-code-icon.svg" width="120" height="120" alt="OpenMotion Logo" />
+  <img src="assets/open-motion.jpg" width="120" height="120" alt="OpenMotion Logo" />
 </p>
 
 <p align="center">
@@ -33,19 +33,25 @@ OpenMotion is a high-performance, open-source alternative to Remotion. It allows
 
 The OpenMotion ecosystem is modular:
 
-| Package | Description |
-| :--- | :--- |
-| [`@open-motion/core`](./packages/core) | Core React primitives, hooks, and player components. |
-| [`@open-motion/renderer`](./packages/renderer) | Playwright-based engine for capturing frame sequences. |
-| [`@open-motion/cli`](./packages/cli) | Command-line interface for managing and rendering projects. |
-| [`@open-motion/encoder`](./packages/encoder) | FFmpeg wrapper for high-quality video encoding and audio mixing. |
+| Package                                        | Description                                                      |
+| :--------------------------------------------- | :--------------------------------------------------------------- |
+| [`@open-motion/core`](./packages/core)         | Core React primitives, hooks, and player components.             |
+| [`@open-motion/renderer`](./packages/renderer) | Playwright-based engine for capturing frame sequences.           |
+| [`@open-motion/cli`](./packages/cli)           | Command-line interface for managing and rendering projects.      |
+| [`@open-motion/encoder`](./packages/encoder)   | FFmpeg wrapper for high-quality video encoding and audio mixing. |
 
 ## 🚀 Quick Start
 
 ### 1. Define your composition
 
 ```tsx
-import { Composition, Sequence, spring, useCurrentFrame, useVideoConfig } from '@open-motion/core';
+import {
+  Composition,
+  Sequence,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from "@open-motion/core";
 
 const MyVideo = () => {
   const frame = useCurrentFrame();
@@ -53,7 +59,15 @@ const MyVideo = () => {
   const scale = spring({ frame, fps });
 
   return (
-    <div style={{ flex: 1, backgroundColor: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <div
+      style={{
+        flex: 1,
+        backgroundColor: "white",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
       <h1 style={{ transform: `scale(${scale})` }}>Hello OpenMotion</h1>
     </div>
   );
