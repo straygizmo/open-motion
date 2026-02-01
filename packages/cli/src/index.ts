@@ -3,6 +3,7 @@ import { encodeVideo } from '@open-motion/encoder';
 import path from 'path';
 import fs from 'fs';
 import { Command } from 'commander';
+import cliProgress from 'cli-progress';
 
 export const runInit = async (projectName: string) => {
   const targetDir = path.join(process.cwd(), projectName);
@@ -157,6 +158,7 @@ export const runRender = async (options: {
 }) => {
   const tmpDir = path.join(process.cwd(), '.open-motion-tmp');
   const inputProps = options.props ? JSON.parse(options.props) : {};
+  const startTime = Date.now();
 
   console.log(`Fetching compositions from ${options.url}...`);
   const compositions = await getCompositions(options.url);
@@ -184,26 +186,63 @@ export const runRender = async (options: {
 
   console.log(`Rendering composition: ${selectedComp.id} (${config.width}x${config.height}, ${config.fps}fps, ${config.durationInFrames} frames)`);
 
+  const multibar = new cliProgress.MultiBar({
+    clearOnComplete: false,
+    hideCursor: true,
+    format: ' {bar} | {percentage}% | {value}/{total} | {task}',
+  }, cliProgress.Presets.shades_grey);
+
+  const renderBar = multibar.create(config.durationInFrames, 0, { task: 'Rendering' });
+
   const { audioAssets } = await renderFrames({
     url: options.url,
     config,
     outputDir: tmpDir,
     compositionId: selectedComp.id,
     inputProps,
-    concurrency: options.concurrency || 1
+    concurrency: options.concurrency || 1,
+    onProgress: (frame) => renderBar.update(frame)
   });
 
-  // Handle first audio asset for now (simplified)
-  const audioFile = audioAssets.length > 0 ? audioAssets[0].src : undefined;
+  renderBar.update(config.durationInFrames);
+
+  // Resolve audio paths to absolute file paths if they are relative URLs
+  const resolvedAudioAssets = audioAssets.map(asset => {
+    if (asset.src.startsWith('/') && !asset.src.startsWith('//')) {
+      // Look for public folder relative to the URL if possible, but for now
+      // let's try common locations
+      const possiblePaths = [
+        path.join(process.cwd(), 'examples/demo/public', asset.src.substring(1)),
+        path.join(process.cwd(), 'public', asset.src.substring(1)),
+      ];
+
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          return { ...asset, src: p };
+        }
+      }
+    }
+    return asset;
+  });
+
+  const encodeBar = multibar.create(100, 0, { task: 'Encoding ' });
 
   await encodeVideo({
     framesDir: tmpDir,
     fps: config.fps,
     outputFile: options.out,
-    audioFile
+    audioAssets: resolvedAudioAssets,
+    onProgress: (percent) => encodeBar.update(Math.round(percent))
   });
 
-  console.log(`Success! Video rendered to ${options.out}`);
+  encodeBar.update(100);
+  multibar.stop();
+
+  const endTime = Date.now();
+  const durationSec = ((endTime - startTime) / 1000).toFixed(1);
+
+  console.log(`\nSuccess! Video rendered to ${options.out}`);
+  console.log(`Total time: ${durationSec}s`);
 };
 
 export const main = () => {
@@ -240,7 +279,17 @@ export const main = () => {
     .option('--duration <number>', 'Override duration in frames', parseInt)
     .action(async (options) => {
       try {
-        await runRender(options);
+        await runRender({
+          url: options.url,
+          out: options.out,
+          compositionId: options.composition,
+          props: options.props,
+          concurrency: options.concurrency,
+          width: options.width,
+          height: options.height,
+          fps: options.fps,
+          duration: options.duration
+        });
       } catch (err) {
         console.error('Render failed:', err);
         process.exit(1);
