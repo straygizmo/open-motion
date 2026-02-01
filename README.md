@@ -127,11 +127,13 @@ Explore our examples to see OpenMotion in action:
 
 ### Showcase Videos
 
-| Multi-track Audio | Easing Curves |
+| Brand Kit Showcase | Multi-track Audio |
 | :--- | :--- |
-| <img src="assets/demo-audio.gif" width="400" alt="Audio Showcase" /> | <img src="assets/demo-easing.gif" width="400" alt="Easing Showcase" /> |
-| **Data Dashboard** | **Video Components** |
-| <img src="assets/demo-main.gif" width="400" alt="Data Dashboard" /> | <img src="assets/demo-video.gif" width="400" alt="Video Components" /> |
+| <img src="assets/demo-brand.gif" width="400" alt="Brand Showcase" /> | <img src="assets/demo-audio.gif" width="400" alt="Audio Showcase" /> |
+| **Easing Curves** | **Data Dashboard** |
+| <img src="assets/demo-easing.gif" width="400" alt="Easing Showcase" /> | <img src="assets/demo-main.gif" width="400" alt="Data Dashboard" /> |
+| **Video Components** | |
+| <img src="assets/demo-video.gif" width="400" alt="Video Components" /> | |
 
 
 ## 🛠 Installation

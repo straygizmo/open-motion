@@ -120,7 +120,7 @@ importers:
   packages/encoder:
     dependencies:
       fluent-ffmpeg:
-        specifier: ^2.1.2
+        specifier: ^2.1.3
         version: 2.1.3
 
   packages/renderer:

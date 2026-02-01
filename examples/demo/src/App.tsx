@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   CompositionProvider,
   Composition,
@@ -13,6 +13,7 @@ import { Dashboard } from './scenes/Dashboard';
 import { AudioShowcase } from './scenes/AudioShowcase';
 import { EasingShowcase } from './scenes/EasingShowcase';
 import { VideoShowcase } from './scenes/VideoShowcase';
+import { BrandShowcase } from './scenes/BrandShowcase';
 
 const configs = {
   main: { width: 1280, height: 720, fps: 30, durationInFrames: 300 },
@@ -21,6 +22,7 @@ const configs = {
   audio: { width: 1280, height: 720, fps: 30, durationInFrames: 300 },
   easing: { width: 1280, height: 720, fps: 30, durationInFrames: 120 },
   video: { width: 1280, height: 720, fps: 30, durationInFrames: 150 },
+  brand: { width: 1280, height: 720, fps: 30, durationInFrames: 450 },
 };
 
 const sceneMapping: Record<string, { component: React.ComponentType<any>, config: any }> = {
@@ -30,6 +32,7 @@ const sceneMapping: Record<string, { component: React.ComponentType<any>, config
   'audio': { component: AudioShowcase, config: configs.audio },
   'easing': { component: EasingShowcase, config: configs.easing },
   'video': { component: VideoShowcase, config: configs.video },
+  'brand': { component: BrandShowcase, config: configs.brand },
 };
 
 if (typeof window !== 'undefined') {
@@ -41,17 +44,26 @@ if (typeof window !== 'undefined') {
 export const App = () => {
   const isRendering = typeof (window as any).__OPEN_MOTION_FRAME__ === 'number';
 
-  if (isRendering) {
-    const compositionId = (window as any).__OPEN_MOTION_COMPOSITION_ID__ || 'main';
-    const inputProps = (window as any).__OPEN_MOTION_INPUT_PROPS__ || {};
+  // 核心逻辑：从 URL 中获取 scene 参数，实现彻底的物理隔离
+  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const urlSceneId = urlParams.get('scene');
+  const compositionId = urlSceneId || (window as any).__OPEN_MOTION_COMPOSITION_ID__ || 'main';
+
+  if (isRendering || urlSceneId) {
     const scene = sceneMapping[compositionId] || sceneMapping.main;
+    const frame = (window as any).__OPEN_MOTION_FRAME__ || 0;
+    const inputProps = (window as any).__OPEN_MOTION_INPUT_PROPS__ || {};
 
     return (
       <CompositionProvider
+        key={compositionId} // 强制 React 重新挂载，清除所有组件状态
         config={scene.config}
-        frame={(window as any).__OPEN_MOTION_FRAME__}
+        frame={frame}
         inputProps={inputProps}
       >
+        <div style={{ position: 'absolute', top: 5, left: 5, color: 'rgba(255,0,0,0.3)', fontSize: 10, zIndex: 999 }}>
+          SCENE: {compositionId}
+        </div>
         <scene.component />
       </CompositionProvider>
     );
@@ -65,66 +77,20 @@ export const App = () => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(600px, 1fr))', gap: '40px' }}>
-        <section style={sectionStyle}>
-          <h3>🎬 Main Demo Video</h3>
-          <Player
-            component={DemoVideo}
-            config={configs.main}
-            inputProps={{ title: 'OpenMotion 1.0', backgroundColor: '#f0f9ff' }}
-            autoPlay
-            loop
-          />
-        </section>
-
-        <section style={sectionStyle}>
-          <h3>📈 Data Dashboard</h3>
-          <Player
-            component={Dashboard}
-            config={configs.dashboard}
-            autoPlay
-            loop
-          />
-        </section>
-
-        <section style={sectionStyle}>
-          <h3>🎵 Multi-track Audio</h3>
-          <Player
-            component={AudioShowcase}
-            config={configs.audio}
-            autoPlay
-            loop
-          />
-        </section>
-
-        <section style={sectionStyle}>
-          <h3>✨ Zootopia Easing Race</h3>
-          <Player
-            component={EasingShowcase}
-            config={configs.easing}
-            autoPlay
-            loop
-          />
-        </section>
-
-        <section style={sectionStyle}>
-          <h3>📹 Cinematic Video Control</h3>
-          <Player
-            component={VideoShowcase}
-            config={configs.video}
-            autoPlay
-            loop
-          />
-        </section>
-
-        <section style={sectionStyle}>
-          <h3>📦 Interpolation & Physics</h3>
-          <Player
-            component={MovingBox}
-            config={configs.interpolation}
-            autoPlay
-            loop
-          />
-        </section>
+        {Object.entries(sceneMapping).map(([id, scene]) => (
+          <section key={id} style={sectionStyle}>
+            <h3>🎬 {id.toUpperCase()} Showcase</h3>
+            <div style={{ marginBottom: 10 }}>
+               <a href={`?scene=${id}`} target="_blank" style={{ fontSize: 12, color: '#3b82f6' }}>Open in isolation (Anti-cache)</a>
+            </div>
+            <Player
+              component={scene.component}
+              config={scene.config}
+              autoPlay
+              loop
+            />
+          </section>
+        ))}
       </div>
 
       <div style={{ display: 'none' }}>
