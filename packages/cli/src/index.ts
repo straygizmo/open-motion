@@ -6,6 +6,9 @@ import fs from 'fs';
 import { Command } from 'commander';
 import cliProgress from 'cli-progress';
 import { execSync } from 'child_process';
+import { runGenerate } from './commands/generate';
+import { runEdit } from './commands/edit';
+import { runConfigSet, runConfigGet, runConfigList, printConfigHelp } from './commands/config';
 
 const getPackageManager = () => {
   try {
@@ -370,11 +373,17 @@ Quick Start:
   1. Initialize project:  $ open-motion init my-video
   2. Enter directory:     $ cd my-video
   3. Install deps:        $ pnpm install
-  4. Start dev server:    $ pnpm dev
-  5. Render video:        $ pnpm render
+  4. Configure LLM:       $ open-motion config set provider openai
+                          $ open-motion config set openai.apiKey sk-...
+  5. Generate scenes:     $ open-motion generate "Reactのライフサイクルを説明する動画"
+  6. Edit a scene:        $ open-motion edit src/scenes/IntroScene.tsx
+  7. Start dev server:    $ pnpm dev
+  8. Render video:        $ pnpm render
 
 Example Usage:
   $ open-motion init my-project
+  $ open-motion generate "TypeScriptの型システム解説動画"
+  $ open-motion edit src/scenes/IntroScene.tsx --message "背景を青に変えて"
   $ open-motion render -u http://localhost:5173 -o output.mp4 --composition main
 `);
 
@@ -434,6 +443,157 @@ Examples:
   $ open-motion render -u http://localhost:5173 -o out.mp4
   $ open-motion render -u http://localhost:5173 -o out.mp4 --composition main --concurrency 4
   $ open-motion render -u http://localhost:3000 -o banner.gif --format gif --width 1200 --height 630
+`);
+
+  // ---------------------------------------------------------------------------
+  // generate command
+  // ---------------------------------------------------------------------------
+  const generateCommand = program
+    .command('generate <description>')
+    .description('LLMを使用して動画のシーンTSXを自動生成する')
+    .option('--provider <name>', 'LLMプロバイダ (openai/anthropic/google/ollama/openai-compatible)')
+    .option('--model <name>', '使用するモデル名')
+    .option('--api-key <key>', 'APIキー (設定ファイル・環境変数より優先)')
+    .option('--base-url <url>', 'ベースURL (openai-compatible / ollama)')
+    .option('--scenes <number>', '生成するシーン数 (省略時はLLMが決定)', parseInt)
+    .option('--fps <number>', 'フレームレート (デフォルト: 30)', parseInt)
+    .option('--width <number>', '動画の幅 (デフォルト: 1280)', parseInt)
+    .option('--height <number>', '動画の高さ (デフォルト: 720)', parseInt)
+    .option('--output <dir>', 'シーンファイルの出力ディレクトリ (デフォルト: src/scenes)')
+    .action(async (description: string, options) => {
+      try {
+        await runGenerate(description, {
+          provider: options.provider,
+          model: options.model,
+          apiKey: options.apiKey,
+          baseURL: options.baseUrl,
+          scenes: options.scenes,
+          fps: options.fps,
+          width: options.width,
+          height: options.height,
+          output: options.output,
+        });
+      } catch (err) {
+        console.error('Generate failed:', err);
+        process.exit(1);
+      }
+    });
+
+  generateCommand.addHelpText('after', `
+Examples:
+  $ open-motion generate "Reactのライフサイクルを説明する動画"
+  $ open-motion generate "TypeScriptの型システム解説" --scenes 4 --fps 30
+  $ open-motion generate "AWS S3の使い方" --provider anthropic --model claude-opus-4-5
+  $ open-motion generate "Dockerの仕組み" --provider ollama --model llama3
+  $ open-motion generate "CI/CDパイプライン解説" --width 1920 --height 1080
+
+Note:
+  - 事前に LLM の設定が必要です: open-motion config set provider openai
+  - 既存プロジェクト (open-motion init で作成したもの) のルートで実行してください
+`);
+
+  // ---------------------------------------------------------------------------
+  // edit command
+  // ---------------------------------------------------------------------------
+  const editCommand = program
+    .command('edit <file>')
+    .description('LLMを使用してTSXシーンファイルをインタラクティブに編集する')
+    .option('-m, --message <instruction>', 'ワンショットモード: 指示を文字列で渡す')
+    .option('--provider <name>', 'LLMプロバイダ (openai/anthropic/google/ollama/openai-compatible)')
+    .option('--model <name>', '使用するモデル名')
+    .option('--api-key <key>', 'APIキー (設定ファイル・環境変数より優先)')
+    .option('--base-url <url>', 'ベースURL (openai-compatible / ollama)')
+    .option('-y, --yes', '確認なしで変更を自動適用 (ワンショットモード時)')
+    .action(async (file: string, options) => {
+      try {
+        await runEdit(file, {
+          message: options.message,
+          provider: options.provider,
+          model: options.model,
+          apiKey: options.apiKey,
+          baseURL: options.baseUrl,
+          yes: options.yes,
+        });
+      } catch (err) {
+        console.error('Edit failed:', err);
+        process.exit(1);
+      }
+    });
+
+  editCommand.addHelpText('after', `
+Examples:
+  # インタラクティブモード (対話形式で繰り返し編集)
+  $ open-motion edit src/scenes/IntroScene.tsx
+
+  # ワンショットモード (1回だけ指示を渡す)
+  $ open-motion edit src/scenes/IntroScene.tsx --message "背景を青にして"
+  $ open-motion edit src/scenes/IntroScene.tsx -m "テキストを大きくして" --yes
+
+  # プロバイダを指定
+  $ open-motion edit src/scenes/IntroScene.tsx --provider anthropic -m "アニメーションを滑らかに"
+`);
+
+  // ---------------------------------------------------------------------------
+  // config command
+  // ---------------------------------------------------------------------------
+  const configCommand = program
+    .command('config')
+    .description('LLMプロバイダの設定を管理する (~/.open-motion/config.json)')
+    .action(() => {
+      printConfigHelp();
+    });
+
+  configCommand
+    .command('set <key> <value>')
+    .description('設定値を保存する')
+    .action((key: string, value: string) => {
+      runConfigSet(key, value);
+    });
+
+  configCommand
+    .command('get <key>')
+    .description('設定値を表示する')
+    .action((key: string) => {
+      runConfigGet(key);
+    });
+
+  configCommand
+    .command('list')
+    .description('全設定を一覧表示する')
+    .action(() => {
+      runConfigList();
+    });
+
+  configCommand.addHelpText('after', `
+設定可能なキー:
+  provider                      使用するプロバイダ (openai/anthropic/google/ollama/openai-compatible)
+  model                         グローバルモデル上書き
+  openai.apiKey                 OpenAI APIキー
+  openai.model                  OpenAIモデル (デフォルト: gpt-4o)
+  anthropic.apiKey              Anthropic APIキー
+  anthropic.model               Anthropicモデル (デフォルト: claude-3-5-sonnet-20241022)
+  google.apiKey                 Google AIキー
+  google.model                  Googleモデル (デフォルト: gemini-1.5-pro)
+  ollama.baseURL                OllamaサーバURL (デフォルト: http://localhost:11434)
+  ollama.model                  Ollamaモデル (デフォルト: llama3)
+  openai-compatible.baseURL     カスタムAPIのベースURL
+  openai-compatible.apiKey      カスタムAPIのAPIキー
+  openai-compatible.model       カスタムAPIのモデル名
+
+環境変数 (設定ファイルより優先):
+  OPEN_MOTION_PROVIDER          プロバイダ上書き
+  OPEN_MOTION_MODEL             モデル上書き
+  OPENAI_API_KEY                OpenAI APIキー
+  ANTHROPIC_API_KEY             Anthropic APIキー
+  GOOGLE_API_KEY / GEMINI_API_KEY  Google AIキー
+  OPEN_MOTION_BASE_URL          カスタムベースURL
+  OPEN_MOTION_API_KEY           カスタムAPIキー
+
+Examples:
+  $ open-motion config set provider openai
+  $ open-motion config set openai.apiKey sk-...
+  $ open-motion config set openai.model gpt-4o
+  $ open-motion config list
 `);
 
   program.parse(process.argv);

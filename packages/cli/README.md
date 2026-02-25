@@ -5,6 +5,8 @@ The Command Line Interface for **OpenMotion** — the open-source programmatic v
 ## 🚀 Features
 
 - 🏗️ **Quick Init**: Scaffold new OpenMotion projects instantly.
+- 🤖 **AI Generation**: Generate scenes and code from text descriptions.
+- ✍️ **AI Editing**: Refine your TSX components using natural language.
 - 🎥 **High-Speed Rendering**: Capture and encode videos directly from your React code.
 - 🚀 **Parallel Execution**: Leverage multi-core CPUs for faster frame capturing.
 - 🎛️ **Dynamic Props**: Inject external data into your videos via JSON.
@@ -22,6 +24,26 @@ npx @open-motion/cli --help
 ### Initialize a project
 ```bash
 open-motion init my-video
+```
+
+### Configure LLM (Optional for AI features)
+```bash
+open-motion config set provider openai
+open-motion config set openai.apiKey sk-...
+```
+
+### Generate a video from description
+```bash
+open-motion generate "Explain how React hooks work"
+```
+
+### Edit a scene file
+```bash
+# Interactive mode
+open-motion edit src/scenes/IntroScene.tsx
+
+# One-shot mode
+open-motion edit src/scenes/IntroScene.tsx -m "Make the text color blue" --yes
 ```
 
 ### Render a video

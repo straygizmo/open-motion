@@ -31,6 +31,8 @@ OpenMotion is a high-performance, open-source alternative to Remotion. It allows
 ## ✨ Features
 
 - ⚛️ **React-First**: Use the full power of the React ecosystem.
+- 🤖 **AI-Powered Generation**: Create entire videos from text descriptions using LLMs.
+- ✍️ **AI-Assisted Editing**: Edit your TSX scenes using natural language.
 - ⏱️ **Frame-Perfect Determinism**: Advanced time-hijacking ensures every frame is identical.
 - 🚀 **Parallel Rendering**: Scale your rendering speed by utilizing all CPU cores.
 - 🎵 **Multi-track Audio Mixing**: Support for multiple `<Audio />` with independent volume.
@@ -86,6 +88,32 @@ open-motion render -u http://localhost:5173 -o out.mp4
 
 ### `open-motion init <name>`
 Initialize a new OpenMotion project with a pre-configured React template.
+
+### `open-motion generate <description>`
+Automatically generate video scenes and code from a text description using an LLM.
+
+| Option | Description |
+| :--- | :--- |
+| `--provider <name>` | LLM provider (`openai`, `anthropic`, `google`, `ollama`, `openai-compatible`) |
+| `--model <name>` | Model name (e.g., `gpt-4o`, `claude-3-5-sonnet`) |
+| `--scenes <number>` | Number of scenes to generate |
+| `--fps <number>` | Frames per second (default: 30) |
+| `--width <number>` | Video width (default: 1280) |
+| `--height <number>` | Video height (default: 720) |
+
+### `open-motion edit <file>`
+Edit a TSX scene file using natural language instructions.
+
+| Option | Description |
+| :--- | :--- |
+| `-m, --message <msg>` | Instruction for editing |
+| `-y, --yes` | Auto-apply changes (one-shot mode) |
+
+### `open-motion config`
+Manage LLM provider settings (API keys, models).
+
+- `open-motion config set <key> <value>`
+- `open-motion config list`
 
 ### `open-motion render`
 Render a video from a running OpenMotion application.

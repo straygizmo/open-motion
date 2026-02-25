@@ -1,0 +1,416 @@
+import fs from 'fs';
+import path from 'path';
+import { generateText } from 'ai';
+import chalk from 'chalk';
+import { resolveConfig, validateConfig, type CliConfigOverrides } from '../llm/config';
+import { createModel } from '../llm/factory';
+import {
+  GENERATE_SYSTEM_PROMPT,
+  buildPlanningPrompt,
+  buildSceneCodePrompt,
+  parsePlanResponse,
+  parseCodeResponse,
+  type ScenePlan,
+} from '../prompts/generate';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface GenerateOptions {
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  baseURL?: string;
+  scenes?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+  output?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Simple spinner using stdout */
+class Spinner {
+  private frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  private idx = 0;
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private current = '';
+
+  start(text: string): void {
+    this.current = text;
+    process.stdout.write('\n');
+    this.timer = setInterval(() => {
+      process.stdout.write(
+        `\r${chalk.cyan(this.frames[this.idx % this.frames.length])} ${this.current}`
+      );
+      this.idx++;
+    }, 80);
+  }
+
+  update(text: string): void {
+    this.current = text;
+  }
+
+  succeed(text: string): void {
+    this.stop();
+    process.stdout.write(`\r${chalk.green('✓')} ${text}\n`);
+  }
+
+  fail(text: string): void {
+    this.stop();
+    process.stdout.write(`\r${chalk.red('✗')} ${text}\n`);
+  }
+
+  private stop(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+}
+
+/**
+ * Convert a video title (or scene title) to a valid PascalCase component name.
+ * E.g. "React Lifecycle" → "ReactLifecycle"
+ */
+function toPascalCase(str: string): string {
+  return str
+    .replace(/[^a-zA-Z0-9\u3040-\u30FF\u4E00-\u9FFF]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map((word) =>
+      /^[a-zA-Z]/.test(word)
+        ? word.charAt(0).toUpperCase() + word.slice(1)
+        : word
+    )
+    .join('');
+}
+
+/**
+ * Build the main composition TSX that assembles all scenes in a Sequence.
+ */
+function buildCompositionFile(
+  videoTitle: string,
+  plan: ScenePlan,
+  fps: number,
+  width: number,
+  height: number
+): string {
+  const imports = plan.scenes
+    .map((s) => `import { ${s.componentName} } from './scenes/${s.componentName}';`)
+    .join('\n');
+
+  let offset = 0;
+  const sequences = plan.scenes
+    .map((s) => {
+      const durationInFrames = Math.round(s.durationInSeconds * fps);
+      const from = offset;
+      offset += durationInFrames;
+      return `  <Sequence from={${from}} durationInFrames={${durationInFrames}}>\n    <${s.componentName} />\n  </Sequence>`;
+    })
+    .join('\n');
+
+  const totalFrames = offset;
+  const componentName = toPascalCase(videoTitle) + 'Video';
+
+  return `import React from 'react';
+import { Sequence, useVideoConfig } from '@open-motion/core';
+${imports}
+
+/** Auto-generated composition: ${videoTitle} */
+export const ${componentName} = () => {
+  const { width, height } = useVideoConfig();
+  return (
+    <div style={{ width, height, overflow: 'hidden', backgroundColor: '#000' }}>
+${sequences}
+    </div>
+  );
+};
+
+/** Total duration in frames: ${totalFrames} (${(totalFrames / fps).toFixed(1)}s at ${fps}fps) */
+export const ${componentName}Config = {
+  id: '${componentName.replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))}',
+  component: ${componentName},
+  width: ${width},
+  height: ${height},
+  fps: ${fps},
+  durationInFrames: ${totalFrames},
+} as const;
+`;
+}
+
+/**
+ * Inject a new Composition into src/main.tsx.
+ * Finds the hidden-div block and appends the Composition before its closing tag.
+ */
+function updateMainTsx(
+  mainTsxPath: string,
+  compositionFile: string,
+  componentName: string,
+  config: { id: string; width: number; height: number; fps: number; durationInFrames: number }
+): void {
+  if (!fs.existsSync(mainTsxPath)) {
+    return; // No main.tsx to update — skip silently
+  }
+
+  let content = fs.readFileSync(mainTsxPath, 'utf8');
+
+  // Add import at the top (after the last existing import line)
+  const importStatement = `import { ${componentName}, ${componentName}Config } from './${compositionFile}';`;
+  if (content.includes(importStatement)) {
+    return; // Already imported
+  }
+
+  // Insert import after the last import block
+  const lastImportIndex = content.lastIndexOf('\nimport ');
+  if (lastImportIndex !== -1) {
+    const endOfLastImport = content.indexOf('\n', lastImportIndex + 1);
+    content =
+      content.slice(0, endOfLastImport + 1) +
+      importStatement +
+      '\n' +
+      content.slice(endOfLastImport + 1);
+  } else {
+    content = importStatement + '\n' + content;
+  }
+
+  // Insert Composition element before the closing </div> of the hidden block
+  const compositionElement =
+    `        <Composition\n` +
+    `          id="${config.id}"\n` +
+    `          component={${componentName}Config.component}\n` +
+    `          width={${config.width}}\n` +
+    `          height={${config.height}}\n` +
+    `          fps={${config.fps}}\n` +
+    `          durationInFrames={${config.durationInFrames}}\n` +
+    `        />`;
+
+  // Find the hidden div's closing </div>
+  const hiddenDivPattern = /display:\s*['"]none['"]/;
+  const match = hiddenDivPattern.exec(content);
+  if (match) {
+    // Find the closing </div> after this point
+    const searchFrom = match.index;
+    const closingTag = '</div>';
+    const closingIdx = content.indexOf(closingTag, searchFrom);
+    if (closingIdx !== -1) {
+      content =
+        content.slice(0, closingIdx) +
+        compositionElement +
+        '\n' +
+        content.slice(closingIdx);
+    }
+  }
+
+  fs.writeFileSync(mainTsxPath, content, 'utf8');
+}
+
+// ---------------------------------------------------------------------------
+// Main command
+// ---------------------------------------------------------------------------
+
+export async function runGenerate(
+  description: string,
+  options: GenerateOptions
+): Promise<void> {
+  const fps = options.fps ?? 30;
+  const width = options.width ?? 1280;
+  const height = options.height ?? 720;
+
+  // Resolve output directory (default: src/scenes relative to cwd)
+  const outputDir = options.output
+    ? path.resolve(process.cwd(), options.output)
+    : path.join(process.cwd(), 'src', 'scenes');
+
+  console.log(chalk.bold('\nopen-motion generate'));
+  console.log(chalk.dim(`Description : ${description}`));
+  console.log(chalk.dim(`Output dir  : ${outputDir}`));
+  console.log('');
+
+  // ------------------------------------------------------------------
+  // 1. Resolve & validate LLM config
+  // ------------------------------------------------------------------
+  const configOverrides: CliConfigOverrides = {
+    provider: options.provider,
+    model: options.model,
+    apiKey: options.apiKey,
+    baseURL: options.baseURL,
+  };
+
+  let resolvedCfg;
+  try {
+    resolvedCfg = resolveConfig(configOverrides);
+    validateConfig(resolvedCfg);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+
+  console.log(
+    chalk.dim(`Provider: ${resolvedCfg.provider}  Model: ${resolvedCfg.model}`)
+  );
+
+  let model;
+  try {
+    model = await createModel(resolvedCfg);
+  } catch (err) {
+    console.error(chalk.red(`Failed to initialize LLM provider: ${(err as Error).message}`));
+    process.exit(1);
+  }
+
+  // ------------------------------------------------------------------
+  // 2. Plan scenes
+  // ------------------------------------------------------------------
+  const spinner = new Spinner();
+  spinner.start('[1/3] シーン構成を検討中...');
+
+  let plan: ScenePlan;
+  try {
+    const { text } = await generateText({
+      model,
+      system: GENERATE_SYSTEM_PROMPT,
+      prompt: buildPlanningPrompt(description),
+      maxTokens: 2048,
+    });
+    plan = parsePlanResponse(text);
+  } catch (err) {
+    spinner.fail('シーン構成の生成に失敗しました');
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+
+  // Optionally override number of scenes
+  if (options.scenes && options.scenes > 0 && options.scenes !== plan.scenes.length) {
+    // Just warn — we respect what the LLM returned unless explicitly trimmed/expanded
+    console.log(
+      chalk.yellow(
+        `\n  Note: LLM generated ${plan.scenes.length} scenes ` +
+        `(you requested ${options.scenes}). Using LLM's plan.`
+      )
+    );
+  }
+
+  spinner.succeed(`[1/3] シーン構成: ${plan.scenes.length}シーン`);
+  plan.scenes.forEach((s, i) => {
+    console.log(
+      chalk.dim(`       Scene ${i + 1}: ${s.title} (${s.durationInSeconds}s)`)
+    );
+  });
+  console.log('');
+
+  // ------------------------------------------------------------------
+  // 3. Generate TSX for each scene
+  // ------------------------------------------------------------------
+  spinner.start(`[2/3] TSXを生成中... (0/${plan.scenes.length})`);
+
+  const scenesDir = path.join(outputDir);
+  fs.mkdirSync(scenesDir, { recursive: true });
+
+  const generatedFiles: string[] = [];
+
+  for (let i = 0; i < plan.scenes.length; i++) {
+    const scene = plan.scenes[i];
+    spinner.update(`[2/3] TSXを生成中... (${i + 1}/${plan.scenes.length}) — ${scene.title}`);
+
+    const durationInFrames = Math.round(scene.durationInSeconds * fps);
+
+    try {
+      const { text } = await generateText({
+        model,
+        system: GENERATE_SYSTEM_PROMPT,
+        prompt: buildSceneCodePrompt({
+          componentName: scene.componentName,
+          title: scene.title,
+          description: scene.description,
+          durationInSeconds: scene.durationInSeconds,
+          durationInFrames,
+          fps,
+          width,
+          height,
+          sceneIndex: i,
+          totalScenes: plan.scenes.length,
+        }),
+        maxTokens: 4096,
+      });
+
+      const code = parseCodeResponse(text);
+      const filePath = path.join(scenesDir, `${scene.componentName}.tsx`);
+      fs.writeFileSync(filePath, code + '\n', 'utf8');
+      generatedFiles.push(filePath);
+    } catch (err) {
+      spinner.fail(`Scene "${scene.title}" の生成に失敗しました`);
+      console.error(chalk.red((err as Error).message));
+      process.exit(1);
+    }
+  }
+
+  spinner.succeed(`[2/3] TSX生成完了 (${plan.scenes.length}シーン)`);
+  console.log('');
+
+  // ------------------------------------------------------------------
+  // 4. Generate composition wrapper
+  // ------------------------------------------------------------------
+  spinner.start('[3/3] コンポジションファイルを生成中...');
+
+  const compositionCode = buildCompositionFile(plan.videoTitle, plan, fps, width, height);
+  const compositionComponentName = toPascalCase(plan.videoTitle) + 'Video';
+
+  // Total duration for the composition
+  const totalFrames = plan.scenes.reduce(
+    (acc, s) => acc + Math.round(s.durationInSeconds * fps),
+    0
+  );
+
+  // Write composition to src/ (one level above scenes/)
+  const srcDir = path.dirname(outputDir);
+  const compositionFileName = `${compositionComponentName}`;
+  const compositionFilePath = path.join(srcDir, `${compositionFileName}.tsx`);
+  fs.writeFileSync(compositionFilePath, compositionCode + '\n', 'utf8');
+
+  // Try to update main.tsx
+  const mainTsxPath = path.join(srcDir, 'main.tsx');
+  updateMainTsx(mainTsxPath, compositionFileName, compositionComponentName, {
+    id: compositionComponentName
+      .replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase())),
+    width,
+    height,
+    fps,
+    durationInFrames: totalFrames,
+  });
+
+  const updatedMainTsx = fs.existsSync(mainTsxPath);
+  spinner.succeed('[3/3] コンポジション生成完了');
+  console.log('');
+
+  // ------------------------------------------------------------------
+  // 5. Summary
+  // ------------------------------------------------------------------
+  console.log(chalk.bold.green('完了!'));
+  console.log('');
+  console.log(chalk.bold('生成されたファイル:'));
+  generatedFiles.forEach((f) => {
+    const rel = path.relative(process.cwd(), f);
+    console.log(chalk.green('  ✓') + '  ' + rel);
+  });
+  const relComp = path.relative(process.cwd(), compositionFilePath);
+  console.log(chalk.green('  ✓') + '  ' + relComp + chalk.dim('  (コンポジション)'));
+  if (updatedMainTsx) {
+    const relMain = path.relative(process.cwd(), mainTsxPath);
+    console.log(chalk.green('  ✓') + '  ' + relMain + chalk.dim('  (Composition を追記)'));
+  }
+  console.log('');
+  console.log(
+    chalk.dim(
+      `合計: ${plan.scenes.length}シーン, ${totalFrames}フレーム ` +
+      `(${(totalFrames / fps).toFixed(1)}秒 @ ${fps}fps)`
+    )
+  );
+  console.log('');
+  console.log('次のステップ:');
+  console.log(chalk.cyan('  pnpm dev') + '  でプレビュー');
+  console.log(chalk.cyan('  pnpm render') + '  で動画をレンダリング');
+}
