@@ -37,6 +37,7 @@ export const runInit = async (projectName: string) => {
 
   // Template files
   const files = {
+    '.npmrc': 'workspaces=false\n',
     'package.json': JSON.stringify({
       name: projectName,
       private: true,
