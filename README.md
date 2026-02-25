@@ -39,41 +39,41 @@ OpenMotion is a high-performance, open-source alternative to Remotion. It allows
 - 📹 **Offthread Video**: High-performance video decoding moved to background processes.
 - 📊 **Dynamic Metadata**: Calculate video dimensions, duration, and other properties dynamically based on input props.
 - 🎬 **GIF & Video Output**: Render to both MP4 video and GIF formats with automatic format detection.
-### 4. 渲染视频 (正式出片)
+### 4. Render Video (Production Output)
 
-推荐使用项目自带的 `render` 脚本进行渲染，它会自动完成 **构建 -> 启动静态服务 -> 渲染 -> 自动清理** 的全套流程，确保渲染过程极其稳健，不会因开发服务器缓冲区问题而卡死。
+It is recommended to use the project's built-in `render` script for rendering. It automatically handles the full pipeline of **build -> start static server -> render -> cleanup**, ensuring a robust rendering process that won't hang due to dev server buffer issues.
 
 ```bash
-# 执行一键渲染 (默认输出 ./out.mp4，开启 4 线程并行)
+# One-click render (default output: ./out.mp4, 4 parallel threads)
 npm run render
 
-# 修改输出文件名或指定合成 ID (通过 -- 透传参数)
+# Override the output filename or specify a composition ID (pass args via --)
 npm run render -- -o my-video.mp4 -c main
 ```
 
-## 💡 最佳实践
+## 💡 Best Practices
 
-### 稳健渲染方案
-生产环境建议始终优先使用 `npm run render`。该命令内部使用了静态服务模式，彻底告别渲染卡死。
+### Robust Rendering
+For production environments, always prefer `npm run render`. This command uses static server mode internally, completely eliminating the risk of rendering hangs.
 
-### 参数透传技巧
-你可以通过 `npm run render -- [更多参数]` 覆盖脚本中的默认值：
-- **修改并发数**: `npm run render -- -j 8`
-- **指定 Chromium 路径**: `npm run render -- --chromium-path "/path/to/chrome"`
+### Passing Additional Arguments
+You can override the script's defaults via `npm run render -- [additional args]`:
+- **Change concurrency**: `npm run render -- -j 8`
+- **Specify Chromium path**: `npm run render -- --chromium-path "/path/to/chrome"`
 
-### 资源存放
-所有本地图片/视频资源请放在 `public/` 目录下，在代码中通过 `/filename` 路径引用。
+### Asset Storage
+Place all local image/video assets in the `public/` directory and reference them in code using `/filename` paths.
 
-## 🎬 输出格式支持
-- **.mp4**: 标准视频，包含音频。
-- **.webm**: 支持透明背景的高质量视频。
-- **.gif**: 动态图片，不含音频。
-- **.webp**: 现代动图格式，体积更小，质量更好。
+## 🎬 Output Format Support
+- **.mp4**: Standard video with audio.
+- **.webm**: High-quality video with transparency support.
+- **.gif**: Animated images without audio.
+- **.webp**: Modern animated format — smaller file size, better quality than GIF.
 
-## 🛡️ 特色功能
-- 🛡️ **Pre-Flight Checks**: 内置浏览器安装检查与环境验证。
-- 🌍 **Custom Chromium Path**: 支持通过 `--chromium-path` 参数自定义浏览器路径。
-- 🚀 **Turbo Render**: 一键自动化构建与全自动渲染链条。
+## 🛡️ Notable Features
+- 🛡️ **Pre-Flight Checks**: Built-in browser installation checks and environment validation.
+- 🌍 **Custom Chromium Path**: Specify a custom browser path via the `--chromium-path` argument.
+- 🚀 **Turbo Render**: One-click automated build and full rendering pipeline.
 
 ## 📚 API Reference
 
