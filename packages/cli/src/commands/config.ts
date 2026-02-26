@@ -1,103 +1,77 @@
-import path from 'path';
-import os from 'os';
 import chalk from 'chalk';
-import {
-  readConfigFile,
-  setConfigKey,
-  getConfigKey,
-} from '../llm/config';
-
-const CONFIG_FILE = path.join(os.homedir(), '.open-motion', 'config.json');
+import { resolveConfig } from '../llm/config';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Environment variables recognised by open-motion
 // ---------------------------------------------------------------------------
 
-const VALID_KEYS = [
-  'provider',
-  'model',
-  'openai.apiKey',
-  'openai.model',
-  'anthropic.apiKey',
-  'anthropic.model',
-  'google.apiKey',
-  'google.model',
-  'ollama.baseURL',
-  'ollama.model',
-  'openai-compatible.baseURL',
-  'openai-compatible.apiKey',
-  'openai-compatible.model',
-] as const;
+const ENV_VARS: Array<{ key: string; description: string }> = [
+  { key: 'OPEN_MOTION_PROVIDER',  description: 'LLM provider (openai | anthropic | google | ollama | openai-compatible)' },
+  { key: 'OPEN_MOTION_MODEL',     description: 'Model name override' },
+  { key: 'OPENAI_API_KEY',        description: 'API key for OpenAI' },
+  { key: 'ANTHROPIC_API_KEY',     description: 'API key for Anthropic' },
+  { key: 'GOOGLE_API_KEY',        description: 'API key for Google / Gemini' },
+  { key: 'GEMINI_API_KEY',        description: 'Alias for GOOGLE_API_KEY' },
+  { key: 'OPEN_MOTION_API_KEY',   description: 'API key for openai-compatible providers' },
+  { key: 'OPEN_MOTION_BASE_URL',  description: 'Base URL for ollama / openai-compatible providers' },
+];
 
 function maskSecret(key: string, value: string): string {
   const lk = key.toLowerCase();
-  if (lk.endsWith('apikey') || lk.endsWith('api_key')) {
+  if (lk.endsWith('api_key') || lk.endsWith('apikey')) {
     if (value.length <= 8) return '****';
     return value.slice(0, 6) + '...' + value.slice(-4);
   }
   return value;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function flattenConfig(obj: any, prefix = ''): Array<[string, string]> {
-  const pairs: Array<[string, string]> = [];
-  for (const [k, v] of Object.entries(obj)) {
-    const fullKey = prefix ? `${prefix}.${k}` : k;
-    if (v !== null && typeof v === 'object') {
-      pairs.push(...flattenConfig(v, fullKey));
-    } else {
-      pairs.push([fullKey, String(v)]);
-    }
-  }
-  return pairs;
-}
-
 // ---------------------------------------------------------------------------
 // Sub-command handlers
 // ---------------------------------------------------------------------------
 
-export function runConfigSet(key: string, value: string): void {
-  // Normalize key to canonical case if it matches a valid key case-insensitively
-  const canonicalKey = VALID_KEYS.find(vk => vk.toLowerCase() === key.toLowerCase());
-  const finalKey = canonicalKey || key;
-
-  setConfigKey(finalKey, value);
-  const displayVal = maskSecret(finalKey, value);
-  console.log(chalk.green(`✓ ${finalKey} = ${displayVal}`));
-  console.log(chalk.dim(`  Saved to: ${CONFIG_FILE}`));
+export function runConfigSet(_key: string, _value: string): void {
+  console.log(chalk.yellow('The config set command is no longer supported.'));
+  console.log('API keys and settings are read from environment variables only.');
+  console.log('');
+  console.log('Add your values to a ' + chalk.cyan('.env') + ' file in your project directory:');
+  console.log('');
+  console.log(chalk.dim('  # .env'));
+  console.log(chalk.dim('  OPENAI_API_KEY=sk-...'));
+  console.log('');
+  console.log('Run ' + chalk.cyan('open-motion config list') + ' to see all recognised variables.');
 }
 
 export function runConfigGet(key: string): void {
-  const canonicalKey = VALID_KEYS.find(vk => vk.toLowerCase() === key.toLowerCase());
-  const finalKey = canonicalKey || key;
-  const value = getConfigKey(finalKey);
-  if (value === undefined) {
-    console.log(chalk.yellow(`  "${finalKey}" is not set`));
+  const value = process.env[key.toUpperCase()];
+  if (!value || value.trim() === '') {
+    console.log(chalk.yellow(`  "${key}" is not set`));
   } else {
-    console.log(`${finalKey} = ${maskSecret(finalKey, value)}`);
+    console.log(`${key} = ${maskSecret(key, value.trim())}`);
   }
 }
 
 export function runConfigList(): void {
-  const config = readConfigFile();
-  const pairs = flattenConfig(config);
+  const cfg = resolveConfig();
 
-  if (pairs.length === 0) {
-    console.log(chalk.dim('No configuration found'));
-    console.log(chalk.dim(`Config file: ${CONFIG_FILE}`));
-    console.log('');
-    console.log('Example:');
-    console.log(chalk.cyan('  open-motion config set provider openai'));
-    console.log(chalk.cyan('  open-motion config set openai.apiKey sk-...'));
-    return;
-  }
-
-  console.log(chalk.bold(`Config file: ${CONFIG_FILE}`));
+  console.log(chalk.bold('Active configuration'));
+  console.log(chalk.dim('  (resolved from environment variables and .env file)'));
   console.log('');
+  console.log(`  ${'provider'.padEnd(20)} ${cfg.provider}`);
+  console.log(`  ${'model'.padEnd(20)} ${cfg.model}`);
+  if (cfg.apiKey)  console.log(`  ${'apiKey'.padEnd(20)} ${maskSecret('apiKey', cfg.apiKey)}`);
+  if (cfg.baseURL) console.log(`  ${'baseURL'.padEnd(20)} ${cfg.baseURL}`);
 
-  for (const [key, value] of pairs) {
-    const displayVal = maskSecret(key, value);
-    console.log(`  ${chalk.dim(key.padEnd(36))} ${displayVal}`);
+  console.log('');
+  console.log(chalk.bold('Recognised environment variables'));
+  console.log('');
+  for (const { key, description } of ENV_VARS) {
+    const val = process.env[key];
+    const status = val && val.trim() !== ''
+      ? chalk.green(maskSecret(key, val.trim()))
+      : chalk.dim('(not set)');
+    console.log(`  ${key.padEnd(28)} ${status}`);
+    console.log(`  ${' '.repeat(28)} ${chalk.dim(description)}`);
+    console.log('');
   }
 }
 
@@ -108,22 +82,20 @@ export function runConfigList(): void {
 export function printConfigHelp(): void {
   console.log(chalk.bold('open-motion config'));
   console.log('');
-  console.log('Available commands:');
+  console.log('Commands:');
   console.log(
-    `  ${chalk.cyan('open-motion config set <key> <value>')}  Save a configuration value`
+    `  ${chalk.cyan('open-motion config list')}               Show active config and all recognised env vars`
   );
   console.log(
-    `  ${chalk.cyan('open-motion config get <key>')}          Show a configuration value`
-  );
-  console.log(
-    `  ${chalk.cyan('open-motion config list')}               List all configuration values`
+    `  ${chalk.cyan('open-motion config get <VAR>')}          Show the value of a single env var`
   );
   console.log('');
-  console.log('Configurable keys:');
-  VALID_KEYS.forEach((k) => console.log(`  ${chalk.dim(k)}`));
+  console.log('API keys and settings are configured via environment variables.');
+  console.log('You can place them in a ' + chalk.cyan('.env') + ' file in your project directory.');
   console.log('');
-  console.log('Example:');
-  console.log(chalk.cyan('  open-motion config set provider anthropic'));
-  console.log(chalk.cyan('  open-motion config set anthropic.apiKey sk-ant-...'));
-  console.log(chalk.cyan('  open-motion config set openai-compatible.baseURL https://api.example.com/v1'));
+  console.log('Example .env:');
+  console.log(chalk.dim('  OPEN_MOTION_PROVIDER=openai'));
+  console.log(chalk.dim('  OPENAI_API_KEY=sk-...'));
+  console.log('');
+  console.log('See ' + chalk.cyan('.env.example') + ' for all available variables.');
 }

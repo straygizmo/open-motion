@@ -1,69 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
-import type { OpenMotionLLMConfig, ProviderName, ResolvedLLMConfig } from './types';
+import type { ProviderName, ResolvedLLMConfig } from './types';
 import { DEFAULT_MODELS } from './types';
-
-const CONFIG_DIR = path.join(os.homedir(), '.open-motion');
-const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
-
-// ---------------------------------------------------------------------------
-// File I/O
-// ---------------------------------------------------------------------------
-
-export function readConfigFile(): OpenMotionLLMConfig {
-  if (!fs.existsSync(CONFIG_FILE)) {
-    return {};
-  }
-  try {
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
-    return JSON.parse(raw) as OpenMotionLLMConfig;
-  } catch {
-    return {};
-  }
-}
-
-export function writeConfigFile(config: OpenMotionLLMConfig): void {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2) + '\n', 'utf8');
-}
-
-/**
- * Set a nested key using dot notation.
- * e.g. setConfigKey('openai.apiKey', 'sk-...') sets config.openai.apiKey
- */
-export function setConfigKey(key: string, value: string): void {
-  const config = readConfigFile();
-  const parts = key.split('.');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let obj: any = config;
-  for (let i = 0; i < parts.length - 1; i++) {
-    if (obj[parts[i]] === undefined || typeof obj[parts[i]] !== 'object') {
-      obj[parts[i]] = {};
-    }
-    obj = obj[parts[i]];
-  }
-  obj[parts[parts.length - 1]] = value;
-  writeConfigFile(config);
-}
-
-/**
- * Get a nested key using dot notation.
- */
-export function getConfigKey(key: string): string | undefined {
-  const config = readConfigFile();
-  const parts = key.split('.');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let obj: any = config;
-  for (const part of parts) {
-    if (obj === undefined || obj === null) return undefined;
-    obj = obj[part];
-  }
-  return obj !== undefined && obj !== null ? String(obj) : undefined;
-}
 
 // ---------------------------------------------------------------------------
 // Environment variable helpers
@@ -86,26 +22,22 @@ export interface CliConfigOverrides {
 }
 
 /**
- * Merge config file + environment variables + CLI overrides into a single
- * ResolvedLLMConfig. Priority (high → low):
- *   CLI flags > ENV vars > config file > built-in defaults
+ * Merge environment variables + CLI overrides into a single ResolvedLLMConfig.
+ * Priority (high → low):
+ *   CLI flags > ENV vars (.env file values are loaded as ENV vars by dotenv)
  */
 export function resolveConfig(overrides: CliConfigOverrides = {}): ResolvedLLMConfig {
-  const file = readConfigFile();
-
   // 1. Provider
   const provider: ProviderName =
     (overrides.provider as ProviderName | undefined) ||
     (env('OPEN_MOTION_PROVIDER') as ProviderName | undefined) ||
-    file.provider ||
     'openai';
 
   // 2. Model — global override, then provider-specific, then default
-  const modelFromEnv = env('OPEN_MOTION_MODEL');
-  const modelFromFile =
-    file.model || (file[provider] as { model?: string } | undefined)?.model;
   const model =
-    overrides.model || modelFromEnv || modelFromFile || DEFAULT_MODELS[provider];
+    overrides.model ||
+    env('OPEN_MOTION_MODEL') ||
+    DEFAULT_MODELS[provider];
 
   // 3. API key / base URL (provider-specific)
   let apiKey: string | undefined;
@@ -113,46 +45,23 @@ export function resolveConfig(overrides: CliConfigOverrides = {}): ResolvedLLMCo
 
   switch (provider) {
     case 'openai':
-      apiKey =
-        overrides.apiKey ||
-        env('OPENAI_API_KEY') ||
-        file.openai?.apiKey ||
-        (file.openai as any)?.apikey;
+      apiKey = overrides.apiKey || env('OPENAI_API_KEY');
       break;
     case 'anthropic':
-      apiKey =
-        overrides.apiKey ||
-        env('ANTHROPIC_API_KEY') ||
-        file.anthropic?.apiKey ||
-        (file.anthropic as any)?.apikey;
+      apiKey = overrides.apiKey || env('ANTHROPIC_API_KEY');
       break;
     case 'google':
-      apiKey =
-        overrides.apiKey ||
-        env('GOOGLE_API_KEY') ||
-        env('GEMINI_API_KEY') ||
-        file.google?.apiKey ||
-        (file.google as any)?.apikey;
+      apiKey = overrides.apiKey || env('GOOGLE_API_KEY') || env('GEMINI_API_KEY');
       break;
     case 'ollama':
       baseURL =
         overrides.baseURL ||
         env('OPEN_MOTION_BASE_URL') ||
-        file.ollama?.baseURL ||
-        (file.ollama as any)?.baseUrl ||
         'http://localhost:11434';
       break;
     case 'openai-compatible':
-      apiKey =
-        overrides.apiKey ||
-        env('OPEN_MOTION_API_KEY') ||
-        file['openai-compatible']?.apiKey ||
-        (file['openai-compatible'] as any)?.apikey;
-      baseURL =
-        overrides.baseURL ||
-        env('OPEN_MOTION_BASE_URL') ||
-        file['openai-compatible']?.baseURL ||
-        (file['openai-compatible'] as any)?.baseUrl;
+      apiKey = overrides.apiKey || env('OPEN_MOTION_API_KEY');
+      baseURL = overrides.baseURL || env('OPEN_MOTION_BASE_URL');
       break;
   }
 
@@ -171,8 +80,7 @@ export function validateConfig(cfg: ResolvedLLMConfig): void {
     if (!cfg.baseURL) {
       throw new Error(
         'openai-compatible provider requires a base URL.\n' +
-        'Set it with: open-motion config set openai-compatible.baseURL <url>\n' +
-        'or set the OPEN_MOTION_BASE_URL environment variable.'
+        'Set the OPEN_MOTION_BASE_URL environment variable, or pass --base-url.'
       );
     }
     return;
@@ -185,18 +93,10 @@ export function validateConfig(cfg: ResolvedLLMConfig): void {
       ollama: '',
       'openai-compatible': 'OPEN_MOTION_API_KEY',
     };
-    const configKey: Record<ProviderName, string> = {
-      openai: 'openai.apiKey',
-      anthropic: 'anthropic.apiKey',
-      google: 'google.apiKey',
-      ollama: '',
-      'openai-compatible': 'openai-compatible.apiKey',
-    };
     throw new Error(
       `No API key found for provider "${cfg.provider}".\n` +
-      `Set it with one of:\n` +
-      `  open-motion config set ${configKey[cfg.provider]} <key>\n` +
-      `  export ${envVar[cfg.provider]}=<key>`
+      `Set the ${envVar[cfg.provider]} environment variable, or pass --api-key.\n` +
+      `You can also add it to a .env file in your project directory.`
     );
   }
 }
