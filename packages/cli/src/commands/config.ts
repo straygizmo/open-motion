@@ -6,9 +6,11 @@ import { resolveConfig } from '../llm/config';
 // ---------------------------------------------------------------------------
 
 const ENV_VARS: Array<{ key: string; description: string }> = [
-  { key: 'OPEN_MOTION_PROVIDER',  description: 'LLM provider (openai | anthropic | google | ollama | openai-compatible)' },
+  { key: 'OPEN_MOTION_PROVIDER',  description: 'LLM provider (openai | openrouter | anthropic | google | ollama | openai-compatible)' },
   { key: 'OPEN_MOTION_MODEL',     description: 'Model name override' },
   { key: 'OPENAI_API_KEY',        description: 'API key for OpenAI' },
+  { key: 'OPENROUTER_API_KEY',    description: 'API key for OpenRouter' },
+  { key: 'OPENROUTER_BASE_URL',   description: 'Optional base URL for OpenRouter (default: https://openrouter.ai/api/v1)' },
   { key: 'ANTHROPIC_API_KEY',     description: 'API key for Anthropic' },
   { key: 'GOOGLE_API_KEY',        description: 'API key for Google / Gemini' },
   { key: 'GEMINI_API_KEY',        description: 'Alias for GOOGLE_API_KEY' },
@@ -94,8 +96,8 @@ export function printConfigHelp(): void {
   console.log('You can place them in a ' + chalk.cyan('.env') + ' file in your project directory.');
   console.log('');
   console.log('Example .env:');
-  console.log(chalk.dim('  OPEN_MOTION_PROVIDER=openai'));
-  console.log(chalk.dim('  OPENAI_API_KEY=sk-...'));
+  console.log(chalk.dim('  OPEN_MOTION_PROVIDER=openrouter'));
+  console.log(chalk.dim('  OPENROUTER_API_KEY=sk-or-...'));
   console.log('');
   console.log('See ' + chalk.cyan('.env.example') + ' for all available variables.');
 }

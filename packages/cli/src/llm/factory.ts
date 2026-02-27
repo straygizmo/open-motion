@@ -14,6 +14,12 @@ export async function createModel(cfg: ResolvedLLMConfig): Promise<LanguageModel
       return client(cfg.model) as LanguageModelV1;
     }
 
+    case 'openrouter': {
+      const { createOpenAI } = await import('@ai-sdk/openai');
+      const client = createOpenAI({ apiKey: cfg.apiKey, baseURL: cfg.baseURL });
+      return client(cfg.model) as LanguageModelV1;
+    }
+
     case 'anthropic': {
       const { createAnthropic } = await import('@ai-sdk/anthropic');
       const client = createAnthropic({ apiKey: cfg.apiKey });

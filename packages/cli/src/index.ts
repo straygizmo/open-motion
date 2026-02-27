@@ -585,10 +585,13 @@ Examples:
   const generateCommand = program
     .command('generate <description>')
     .description('Auto-generate video scene TSX files using an LLM')
-    .option('--provider <name>', 'LLM provider (openai/anthropic/google/ollama/openai-compatible)')
+    .option(
+      '--provider <name>',
+      'LLM provider (openai/openrouter/anthropic/google/ollama/openai-compatible)'
+    )
     .option('--model <name>', 'Model name to use')
     .option('--api-key <key>', 'API key (overrides config file and environment variables)')
-    .option('--base-url <url>', 'Base URL (for openai-compatible / ollama)')
+    .option('--base-url <url>', 'Base URL (for openrouter / openai-compatible / ollama)')
     .option('--scenes <number>', 'Number of scenes to generate (default: decided by LLM)', parseInt)
     .option('--fps <number>', 'Frame rate (default: 30)', parseInt)
     .option('--width <number>', 'Video width (default: 1280)', parseInt)
@@ -618,11 +621,13 @@ Examples:
   $ open-motion generate "A video explaining the React lifecycle"
   $ open-motion generate "TypeScript type system explainer" --scenes 4 --fps 30
   $ open-motion generate "How to use AWS S3" --provider anthropic --model claude-opus-4-5
+  $ open-motion generate "React hooks overview" --provider openrouter --model openai/gpt-4o
   $ open-motion generate "How Docker works" --provider ollama --model llama3
+  $ open-motion generate "CI/CD pipeline explainer" --provider openai-compatible --base-url https://example.com/v1
   $ open-motion generate "CI/CD pipeline explainer" --width 1920 --height 1080
 
 Note:
-  - LLM must be configured first: open-motion config set provider openai
+  - LLM configuration is read from environment variables (you can put them in a .env file)
   - Run this command from the root of an existing project (created with open-motion init)
 `);
 
@@ -633,10 +638,13 @@ Note:
     .command('edit <file>')
     .description('Interactively edit a TSX scene file using an LLM')
     .option('-m, --message <instruction>', 'One-shot mode: pass instruction as a string')
-    .option('--provider <name>', 'LLM provider (openai/anthropic/google/ollama/openai-compatible)')
+    .option(
+      '--provider <name>',
+      'LLM provider (openai/openrouter/anthropic/google/ollama/openai-compatible)'
+    )
     .option('--model <name>', 'Model name to use')
     .option('--api-key <key>', 'API key (overrides config file and environment variables)')
-    .option('--base-url <url>', 'Base URL (for openai-compatible / ollama)')
+    .option('--base-url <url>', 'Base URL (for openrouter / openai-compatible / ollama)')
     .option('-y, --yes', 'Auto-apply changes without confirmation (one-shot mode only)')
     .action(async (file: string, options) => {
       try {
@@ -700,10 +708,12 @@ Examples:
 
   configCommand.addHelpText('after', `
 Configurable keys:
-  provider                      LLM provider to use (openai/anthropic/google/ollama/openai-compatible)
+  provider                      LLM provider to use (openai/openrouter/anthropic/google/ollama/openai-compatible)
   model                         Global model override
   openai.apiKey                 OpenAI API key
   openai.model                  OpenAI model (default: gpt-4o)
+  openrouter.apiKey             OpenRouter API key
+  openrouter.model              OpenRouter model (default: openai/gpt-4o)
   anthropic.apiKey              Anthropic API key
   anthropic.model               Anthropic model (default: claude-3-5-sonnet-20241022)
   google.apiKey                 Google AI API key
@@ -718,15 +728,16 @@ Environment variables (override config file):
   OPEN_MOTION_PROVIDER          Provider override
   OPEN_MOTION_MODEL             Model override
   OPENAI_API_KEY                OpenAI API key
+  OPENROUTER_API_KEY            OpenRouter API key
+  OPENROUTER_BASE_URL           OpenRouter base URL override
   ANTHROPIC_API_KEY             Anthropic API key
   GOOGLE_API_KEY / GEMINI_API_KEY  Google AI API key
   OPEN_MOTION_BASE_URL          Custom base URL
   OPEN_MOTION_API_KEY           Custom API key
 
 Examples:
-  $ open-motion config set provider openai
-  $ open-motion config set openai.apiKey sk-...
-  $ open-motion config set openai.model gpt-4o
+  $ open-motion config list
+  $ OPEN_MOTION_PROVIDER=openrouter OPENROUTER_API_KEY=sk-or-... open-motion generate "Explain closures"
   $ open-motion config list
 `);
 

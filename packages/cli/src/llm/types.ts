@@ -1,5 +1,6 @@
 export type ProviderName =
   | 'openai'
+  | 'openrouter'
   | 'anthropic'
   | 'google'
   | 'ollama'
@@ -58,6 +59,7 @@ export interface ResolvedLLMConfig {
 /** Default models for each provider */
 export const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: 'gpt-4o',
+  openrouter: 'openai/gpt-4o',
   anthropic: 'claude-3-5-sonnet-20241022',
   google: 'gemini-1.5-pro',
   ollama: 'llama3',

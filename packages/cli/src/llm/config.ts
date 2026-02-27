@@ -21,6 +21,8 @@ export interface CliConfigOverrides {
   baseURL?: string;
 }
 
+const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
+
 /**
  * Merge environment variables + CLI overrides into a single ResolvedLLMConfig.
  * Priority (high → low):
@@ -46,6 +48,19 @@ export function resolveConfig(overrides: CliConfigOverrides = {}): ResolvedLLMCo
   switch (provider) {
     case 'openai':
       apiKey = overrides.apiKey || env('OPENAI_API_KEY');
+      break;
+    case 'openrouter':
+      apiKey =
+        overrides.apiKey ||
+        env('OPENROUTER_API_KEY') ||
+        // Back-compat: allow users to reuse the generic key env var.
+        env('OPEN_MOTION_API_KEY');
+      baseURL =
+        overrides.baseURL ||
+        env('OPENROUTER_BASE_URL') ||
+        // Back-compat: allow using the generic base URL env var.
+        env('OPEN_MOTION_BASE_URL') ||
+        OPENROUTER_DEFAULT_BASE_URL;
       break;
     case 'anthropic':
       apiKey = overrides.apiKey || env('ANTHROPIC_API_KEY');
@@ -88,6 +103,7 @@ export function validateConfig(cfg: ResolvedLLMConfig): void {
   if (!cfg.apiKey) {
     const envVar: Record<ProviderName, string> = {
       openai: 'OPENAI_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
       anthropic: 'ANTHROPIC_API_KEY',
       google: 'GOOGLE_API_KEY',
       ollama: '',
