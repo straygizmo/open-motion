@@ -66,6 +66,11 @@ pnpm install -g @open-motion/cli @open-motion/renderer
 npx playwright install chromium
 ```
 
+Linuxのヘッドレス環境で日本語/中国語などが文字化けする場合は、フォントが入っていないことが原因です。
+
+- OSにフォントを入れる (推奨): `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`
+- もしくはレンダー時にローカルフォントを読み込む: `open-motion render ... --font "Noto Sans JP=./public/fonts/NotoSansJP-Regular.woff2"`
+
 ### 2. プロジェクトの作成
 ```bash
 open-motion init my-video
@@ -119,6 +124,7 @@ OPENAI_API_KEY=sk-...
 | `--public-dir <path>` | 静的アセットの公開ディレクトリ (デフォルト: `./public`) |
 | `--chromium-path <path>`| カスタムChromium実行ファイルのパス |
 | `--timeout <number>` | ブラウザ操作のタイムアウト (ミリ秒) |
+| `--font <spec>` | レンダー時にローカルフォントを読み込む（繰り返し指定可）。形式: `Family=path` または `path` |
 | `--bgm <path>` | ローカルのMP3ファイルをBGMとして追加 |
 | `--bgm-volume <number>` | BGM音量 (0.0-1.0, デフォルト: 1.0) |
 

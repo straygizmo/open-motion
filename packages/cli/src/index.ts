@@ -1,4 +1,4 @@
-import { renderFrames, getCompositions } from '@open-motion/renderer';
+import { renderFrames, getCompositions, type RenderFont } from '@open-motion/renderer';
 import { chromium } from 'playwright';
 import { encodeVideo, encodeGif, encodeWebP } from '@open-motion/encoder';
 import path from 'path';
@@ -313,6 +313,7 @@ export const runRender = async (options: {
   timeout?: number;
   bgm?: string;
   bgmVolume?: number;
+  font?: string[];
 }) => {
   const timeout = options.timeout || parseInt(process.env.OPEN_MOTION_RENDER_TIMEOUT || '300000', 10);
 
@@ -322,6 +323,24 @@ export const runRender = async (options: {
   const tmpDir = path.join(process.cwd(), '.open-motion-tmp');
   const inputProps = options.props ? JSON.parse(options.props) : {};
   const startTime = Date.now();
+
+  const parseFontSpecs = (specs?: string[]): RenderFont[] => {
+    if (!specs || specs.length === 0) return [];
+
+    return specs
+      .map((raw) => String(raw).trim())
+      .filter(Boolean)
+      .map((raw) => {
+        const eq = raw.indexOf('=');
+        if (eq === -1) {
+          return { family: 'OpenMotionFont', path: raw };
+        }
+        const family = raw.slice(0, eq).trim() || 'OpenMotionFont';
+        const p = raw.slice(eq + 1).trim();
+        return { family, path: p };
+      })
+      .filter((f) => Boolean(f.path));
+  };
 
   // Check for browser installation before starting
   try {
@@ -393,7 +412,8 @@ export const runRender = async (options: {
     concurrency: options.concurrency || 1,
     publicDir: options.publicDir ? path.join(process.cwd(), options.publicDir) : undefined,
     onProgress: (frame) => renderBar.update(frame),
-    timeout
+    timeout,
+    fonts: parseFontSpecs(options.font),
   });
 
   renderBar.update(config.durationInFrames);
@@ -570,6 +590,15 @@ Example Usage:
     .option('--format <format>', 'Output format (mp4, webm, gif, webp, auto)', 'auto')
     .option('--chromium-path <path>', 'Custom path to Chromium executable')
     .option('--timeout <number>', 'Timeout for browser operations in milliseconds', parseInt)
+    .option(
+      '--font <spec>',
+      'Load a local font file for rendering (repeatable). Format: "Family=path" or just "path".',
+      (value, previous: string[] = []) => {
+        previous.push(value);
+        return previous;
+      },
+      [] as string[]
+    )
     .option('--bgm <path>', 'Path to an MP3 file to use as background music')
     .option('--bgm-volume <number>', 'BGM volume (0.0-1.0, default: 1.0)', parseFloat)
     .action(async (options) => {
@@ -588,6 +617,7 @@ Example Usage:
           format: options.format,
           chromiumPath: options.chromiumPath,
           timeout: options.timeout,
+          font: options.font,
           bgm: options.bgm,
           bgmVolume: options.bgmVolume,
         });

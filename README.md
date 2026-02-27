@@ -68,6 +68,11 @@ pnpm install -g @open-motion/cli @open-motion/renderer
 npx playwright install chromium
 ```
 
+If Japanese/Chinese/Korean text renders as squares in headless Linux, it's usually missing system fonts. Either install CJK fonts (recommended) or load a local font at render time.
+
+- Install system fonts (Ubuntu/Debian): `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`
+- Or load a local font file: `open-motion render ... --font "Noto Sans JP=./public/fonts/NotoSansJP-Regular.woff2"`
+
 ### 2. Create Project
 ```bash
 open-motion init my-video
@@ -141,6 +146,7 @@ Render a video from a running OpenMotion application.
 | `--public-dir <path>` | Public directory for static assets (default: `./public`) |
 | `--chromium-path <path>`| Path to custom Chromium executable |
 | `--timeout <number>` | Timeout for browser operations in ms |
+| `--font <spec>` | Load a local font file for rendering (repeatable). Format: `Family=path` or just `path` |
 | `--bgm <path>` | Add a background music track from a local MP3 file |
 | `--bgm-volume <number>` | BGM volume (0.0-1.0, default: 1.0) |
 
