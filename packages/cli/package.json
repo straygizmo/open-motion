@@ -6,7 +6,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "tsc && chmod +x dist/bin.js"
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
