@@ -622,7 +622,7 @@ export async function runGenerate(
       totalScenes: plan.scenes.length,
     };
 
-    const MAX_ATTEMPTS = 2;
+    const MAX_ATTEMPTS = 3;
     let lastError: Error | null = null;
     let succeeded = false;
 
@@ -634,11 +634,15 @@ export async function runGenerate(
           );
         }
 
+        const retryContext = attempt > 1 && lastError
+          ? `IMPORTANT: The previous attempt failed with this error:\n${lastError.message}\n\nCommon causes:\n- The file was cut off mid-way (truncated output). Write simpler, shorter code to avoid this.\n- A bracket, parenthesis, or JSX tag was left unclosed.\n- A string or template literal was not terminated.\nFix these issues and output a COMPLETE, syntactically valid TSX file.`
+          : undefined;
+
         const { text } = await generateText({
           model,
           system: GENERATE_SYSTEM_PROMPT,
-          prompt: buildSceneCodePrompt(scenePromptArgs),
-          maxTokens: 4096,
+          prompt: buildSceneCodePrompt({ ...scenePromptArgs, retryContext }),
+          maxTokens: 32768,
         });
 
         const code = parseCodeResponse(text);

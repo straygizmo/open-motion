@@ -47,6 +47,15 @@ setTimeout, setInterval, or any real-time mechanism for animation.
   - GOOD: "量子コンピュータ入門" → "IntroToQuantumComputers" → VALID
 - This rule applies to EVERY identifier: componentName in scenes AND any name derived from videoTitle.
 
+## Output completeness rules (CRITICAL)
+- You MUST output the **entire file** from the first \`import\` to the final closing \`};\` — never truncate.
+- Every opened bracket \`{\`, parenthesis \`(\`, and square bracket \`[\` MUST have a matching close.
+- Every JSX tag that is opened MUST be closed (self-closing or with a closing tag).
+- Every string literal started with \`"\`, \`'\`, or a template literal \`\`\` MUST be terminated on the same line or properly closed.
+- The last line of the file MUST be \`};\` (the closing of the exported component arrow function) followed by a newline.
+- If the component logic is becoming long, **simplify the design** — reduce the number of animated elements, use fewer style properties, or combine logic. Do NOT emit a partial file.
+- Never rely on the reader to "complete" your output. The file must be runnable exactly as emitted.
+
 ## Minimal valid example
 \`\`\`tsx
 import React from 'react';
@@ -209,10 +218,16 @@ export interface SceneCodeContext {
   height: number;
   sceneIndex: number;
   totalScenes: number;
+  /** Populated on retry attempts with a description of the previous failure. */
+  retryContext?: string;
 }
 
 export function buildSceneCodePrompt(ctx: SceneCodeContext): string {
-  return `Generate a complete TSX file for the following open-motion scene:
+  const retrySection = ctx.retryContext
+    ? `\n## Previous attempt failed — read carefully before writing\n${ctx.retryContext}\n`
+    : '';
+
+  return `${retrySection}Generate a complete TSX file for the following open-motion scene:
 
 Component name : ${ctx.componentName}
 Scene title    : ${ctx.title}
@@ -231,6 +246,15 @@ Requirements:
 - Keep text readable and well-positioned
 - Use colors and typography appropriate for the scene's content
 - Do NOT include any Composition registration
+
+Completeness rules (CRITICAL — violations cause build errors):
+- Output the ENTIRE file: from the first \`import\` line to the final \`};\` closing line.
+- Every \`{\` must have a matching \`}\`, every \`(\` a \`)\`, every \`[\` a \`]\`.
+- Every JSX attribute string value started with \`"\` must be closed with \`"\` on the same line.
+- Every JSX element opened must be closed (self-closing \`/>\` or with a \`</tag>\`).
+- Every template literal \`\`\`\` must be terminated with a closing \`\`\`\`\`.
+- The very last line must be \`};\` (end of the exported component), then a newline.
+- If the design is growing too complex, simplify it — use fewer animated elements, fewer style properties. NEVER emit a partial or truncated file.
 
 Return ONLY the raw TSX file content. No markdown code fences, no explanation.`;
 }
@@ -302,6 +326,13 @@ export function parseCodeResponse(text: string): string {
 /**
  * Validate that generated scene code contains the expected named export.
  * Throws a descriptive error if the code is empty or the export is missing.
+ *
+ * Also runs a set of lightweight syntactic integrity checks that catch the
+ * most common truncation / partial-output failures:
+ *   1. Named export presence
+ *   2. Bracket / parenthesis / square-bracket balance (outside string literals)
+ *   3. JSX attribute string value closure on the same line
+ *   4. File ends with a closing `}` or `};`
  */
 export function validateSceneCode(code: string, componentName: string): void {
   if (!code || code.trim().length === 0) {
@@ -310,6 +341,7 @@ export function validateSceneCode(code: string, componentName: string): void {
     );
   }
 
+  // ── 1. Named export check ──────────────────────────────────────────────────
   // Accept: export const Foo, export function Foo, export class Foo
   const namedExportRe = new RegExp(
     `export\\s+(const|function|class)\\s+${componentName}\\b`
@@ -320,5 +352,112 @@ export function validateSceneCode(code: string, componentName: string): void {
       `Expected: \`export const ${componentName} = ...\` (or export function/class).\n` +
       `The exported name in the file must exactly match "${componentName}".`
     );
+  }
+
+  // ── 2. Bracket balance check (skip contents of string/template literals) ───
+  //
+  // Strategy: walk character-by-character, tracking whether we are inside a
+  // string literal ('…', "…") or template literal (`…`).  Inside a literal we
+  // ignore brackets entirely.  This is not a full parser but catches the most
+  // common truncation patterns (e.g. an object literal whose value was cut off).
+  //
+  // Template literal nesting is handled with a stack:
+  //   - Entering `` ` `` pushes 'template' onto the context stack.
+  //   - Inside a template, `${` begins an expression: we count the opening `{`
+  //     in curly and push 'expr' so we know when the matching `}` exits back
+  //     into the template (rather than decrementing curly a second time).
+  //   - Inside 'expr' context, all normal bracket counting applies, and a
+  //     nested `` ` `` pushes another 'template' level.
+  {
+    let inSingle = false;   // inside '…'
+    let inDouble = false;   // inside "…"
+    // Stack entries: 'template' | 'expr'
+    // 'template' = we are inside `…` (template literal body)
+    // 'expr'     = we are inside ${…} inside a template literal
+    const templateStack: Array<'template' | 'expr'> = [];
+    let curly = 0;
+    let paren = 0;
+    let square = 0;
+
+    const inTemplateBody = () =>
+      templateStack.length > 0 && templateStack[templateStack.length - 1] === 'template';
+    const inString = () => inSingle || inDouble || inTemplateBody();
+
+    for (let ci = 0; ci < code.length; ci++) {
+      const ch = code[ci];
+
+      // Handle escape sequences inside string/template literals
+      if (inString() && ch === '\\') {
+        ci++; // skip the escaped character
+        continue;
+      }
+
+      if (!inString()) {
+        if (ch === "'") { inSingle = true; }
+        else if (ch === '"') { inDouble = true; }
+        else if (ch === '`') { templateStack.push('template'); }
+        else if (ch === '{') { curly++; }
+        else if (ch === '}') {
+          // If we are inside a template expression (${…}), this `}` closes
+          // the expression and returns us to the template literal body.
+          if (templateStack.length > 0 && templateStack[templateStack.length - 1] === 'expr') {
+            templateStack.pop();
+            curly--; // the matching `{` from `${` was already counted
+          } else {
+            curly--;
+          }
+        }
+        else if (ch === '(') { paren++; }
+        else if (ch === ')') { paren--; }
+        else if (ch === '[') { square++; }
+        else if (ch === ']') { square--; }
+      } else {
+        // Inside a string — check for closing delimiter
+        if (inSingle && ch === "'") { inSingle = false; }
+        else if (inDouble && ch === '"') { inDouble = false; }
+        else if (inTemplateBody()) {
+          if (ch === '`') {
+            templateStack.pop(); // close this template literal level
+          } else if (ch === '$' && code[ci + 1] === '{') {
+            // Start of a template expression — count the `{` and enter expr context
+            ci++; // skip the `{`
+            curly++;
+            templateStack.push('expr');
+          }
+        }
+      }
+    }
+
+    const imbalanced: string[] = [];
+    if (curly !== 0) imbalanced.push(`curly braces {} (net ${curly > 0 ? '+' : ''}${curly})`);
+    if (paren !== 0) imbalanced.push(`parentheses () (net ${paren > 0 ? '+' : ''}${paren})`);
+    if (square !== 0) imbalanced.push(`square brackets [] (net ${square > 0 ? '+' : ''}${square})`);
+    if (inSingle) imbalanced.push(`unterminated single-quoted string`);
+    if (inDouble) imbalanced.push(`unterminated double-quoted string`);
+    if (templateStack.length > 0) imbalanced.push(`unterminated template literal`);
+
+    if (imbalanced.length > 0) {
+      throw new Error(
+        `Generated code for "${componentName}" appears to be incomplete or truncated.\n` +
+        `Syntax issues detected:\n` +
+        imbalanced.map(s => `  • ${s}`).join('\n') + '\n' +
+        `The file was likely cut off mid-way. The LLM should produce a shorter, simpler component.`
+      );
+    }
+  }
+
+  // ── 3. File-end check ─────────────────────────────────────────────────────
+  // The last non-empty line should close the exported component: `}` or `};`
+  {
+    const lines = code.split('\n');
+    const lastNonEmpty = [...lines].reverse().find(l => l.trim().length > 0) ?? '';
+    const trimmed = lastNonEmpty.trim();
+    if (trimmed !== '}' && trimmed !== '};') {
+      throw new Error(
+        `Generated code for "${componentName}" does not end with \`};\` or \`}\`.\n` +
+        `Last non-empty line is: ${JSON.stringify(lastNonEmpty)}\n` +
+        `The file was likely truncated before the component was fully closed.`
+      );
+    }
   }
 }
