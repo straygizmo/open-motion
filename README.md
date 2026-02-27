@@ -59,6 +59,17 @@ OpenMotion is a high-performance, open-source alternative to Remotion. It allows
 npm install @open-motion/core @open-motion/components
 ```
 
+## 🔧 Building from Source
+
+To build from source, you'll need [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/).
+
+```bash
+git clone https://github.com/jsongo/open-motion.git
+cd open-motion
+pnpm install
+pnpm build
+```
+
 ## 🚀 Quick Start
 
 ### 1. Setup
@@ -99,7 +110,7 @@ Automatically generate video scenes and code from a text description using an LL
 
 | Option | Description |
 | :--- | :--- |
-| `--provider <name>` | LLM provider (`openai`, `anthropic`, `google`, `ollama`, `openai-compatible`) |
+| `--provider <name>` | LLM provider (`openai`, `anthropic`, `google`, `openrouter`, `ollama`, `openai-compatible`) |
 | `--model <name>` | Model name (e.g., `gpt-5.2`, `claude-4-6-sonnet`) |
 | `--scenes <number>` | Number of scenes to generate |
 | `--fps <number>` | Frames per second (default: 30) |
