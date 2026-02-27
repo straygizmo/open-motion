@@ -28,8 +28,14 @@ open-motion init my-video
 
 ### Configure LLM (Optional for AI features)
 ```bash
-open-motion config set provider openai
-open-motion config set openai.apiKey sk-...
+# Configure via environment variables (project-local .env supported)
+# .env
+OPEN_MOTION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+
+# Verify what the CLI sees
+open-motion config list
+open-motion config get OPENAI_API_KEY
 ```
 
 ### Generate a video from description

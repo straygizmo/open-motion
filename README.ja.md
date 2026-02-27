@@ -87,6 +87,20 @@ open-motion render -u http://localhost:5173 -o out.mp4
 ### `open-motion init <name>`
 事前設定されたReactテンプレートを使用して、新しいOpenMotionプロジェクトを初期化します。
 
+### `open-motion config`
+LLMの設定（APIキー、モデルなど）を管理します。
+
+- `open-motion config list`
+- `open-motion config get <VAR>`
+
+設定は環境変数から読み込まれます（プロジェクト直下の `.env` に置けます）：
+
+```bash
+# .env
+OPEN_MOTION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+```
+
 ### `open-motion render`
 実行中のOpenMotionアプリケーションからビデオをレンダリングします。
 

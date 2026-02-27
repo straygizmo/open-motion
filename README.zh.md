@@ -87,6 +87,20 @@ open-motion render -u http://localhost:5173 -o out.mp4
 ### `open-motion init <name>`
 使用预配置的 React 模板初始化一个新的 OpenMotion 项目。
 
+### `open-motion config`
+管理 LLM 配置（API Key、模型等）。
+
+- `open-motion config list`
+- `open-motion config get <VAR>`
+
+配置从环境变量读取（也支持放在项目目录下的 `.env` 文件中）：
+
+```bash
+# .env
+OPEN_MOTION_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+```
+
 ### `open-motion render`
 从正在运行的 OpenMotion 应用程序渲染视频。
 
