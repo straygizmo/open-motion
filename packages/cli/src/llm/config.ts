@@ -15,8 +15,6 @@ function env(key: string): string | undefined {
 // ---------------------------------------------------------------------------
 
 export interface CliConfigOverrides {
-  provider?: string;
-  model?: string;
   apiKey?: string;
   baseURL?: string;
 }
@@ -29,17 +27,10 @@ const OPENROUTER_DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1';
  *   CLI flags > ENV vars (.env file values are loaded as ENV vars by dotenv)
  */
 export function resolveConfig(overrides: CliConfigOverrides = {}): ResolvedLLMConfig {
-  // 1. Provider
   const provider: ProviderName =
-    (overrides.provider as ProviderName | undefined) ||
-    (env('OPEN_MOTION_PROVIDER') as ProviderName | undefined) ||
-    'openai';
+    (env('OPEN_MOTION_PROVIDER') as ProviderName | undefined) || 'openai';
 
-  // 2. Model — global override, then provider-specific, then default
-  const model =
-    overrides.model ||
-    env('OPEN_MOTION_MODEL') ||
-    DEFAULT_MODELS[provider];
+  const model = env('OPEN_MOTION_MODEL') || DEFAULT_MODELS[provider];
 
   // 3. API key / base URL (provider-specific)
   let apiKey: string | undefined;

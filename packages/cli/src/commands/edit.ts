@@ -14,8 +14,6 @@ import { EDIT_SYSTEM_PROMPT, buildEditPrompt, parseEditResponse } from '../promp
 
 export interface EditOptions {
   message?: string;
-  provider?: string;
-  model?: string;
   apiKey?: string;
   baseURL?: string;
   yes?: boolean;
@@ -173,8 +171,6 @@ export async function runEdit(
   // Resolve LLM config
   // ------------------------------------------------------------------
   const configOverrides: CliConfigOverrides = {
-    provider: options.provider,
-    model: options.model,
     apiKey: options.apiKey,
     baseURL: options.baseURL,
   };

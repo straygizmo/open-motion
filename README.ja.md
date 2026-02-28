@@ -31,6 +31,8 @@ OpenMotionは、Remotionに代わる高性能なオープンソースの選択�
 ## ✨ 機能
 
 - ⚛️ **Reactファースト**: Reactエコシステムのパワーを最大限に活用。
+- 🤖 **AI駆動の生成**: LLMを使用してテキスト記述から完全なビデオを作成。
+- ✍️ **AIアシスト編集**: 自然言語を使用してTSXシーンを編集。
 - ⏱️ **フレーム精度の決定論**: 高度なタイムジャック技術により、すべてのフレームが同一であることを保証。
 - 🚀 **並列レンダリング**: すべてのCPUコアを利用してレンダリング速度をスケール。
 - 🎵 **マルチトラック・オーディオミキシング**: 独立した音量制御を持つ複数の `<Audio />` をサポート。
@@ -57,6 +59,30 @@ OpenMotionは、Remotionに代わる高性能なオープンソースの選択�
 npm install @open-motion/core @open-motion/components
 ```
 
+## 🔧 ソースからのビルド
+
+ソースからビルドするには、[Node.js](https://nodejs.org/) と [pnpm](https://pnpm.io/) が必要です。
+
+```bash
+git clone https://github.com/jsongo/open-motion.git
+cd open-motion
+pnpm install
+pnpm build
+```
+
+### Windows: pnpm グローバルリンクの設定
+
+Windowsで `pnpm link --global` を使用する場合、先にグローバルbinディレクトリを設定する必要がある場合があります：
+
+```powershell
+$env:PNPM_HOME = "C:\Users\<YourUser>\AppData\Local\pnpm"
+$env:PATH += ";$env:PNPM_HOME"
+cd packages/cli
+pnpm link --global
+```
+
+または、`pnpm setup` を実行してターミナルを再起動すると、環境変数が自動的に適用されます。
+
 ## 🚀 クイックスタート
 
 ### 1. セットアップ
@@ -66,25 +92,37 @@ pnpm install -g @open-motion/cli @open-motion/renderer
 npx playwright install chromium
 ```
 
-Linuxのヘッドレス環境で日本語/中国語などが文字化けする場合は、フォントが入っていないことが原因です。
+Linuxのヘッドレス環境で日本語/中国語などが文字化けする場合は、フォントが入っていないことが原因です。システムフォントをインストールする（推奨）か、レンダー時にローカルフォントを読み込んでください。
 
-- OSにフォントを入れる (推奨): `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`
-- もしくはレンダー時にローカルフォントを読み込む: `open-motion render ... --font "Noto Sans JP=./public/fonts/NotoSansJP-Regular.woff2"`
+- システムフォントをインストール (Ubuntu/Debian): `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`
+- またはローカルフォントを読み込む: `open-motion render ... --font "Noto Sans JP=./public/fonts/NotoSansJP-Regular.woff2"`
 
 ### 2. プロジェクトの作成
 ```bash
-open-motion init my-video
-cd my-video && pnpm install
+mkdir -p my_videos && cd my_videos
+open-motion init my-video1
+cd ../..  # monorepoのルートに戻る
+pnpm install
 ```
 
 ### 3. 開発とレンダリング
+
 ターミナルで開発サーバーを起動します：
+
 ```bash
+cd my_videos/my-video1
 pnpm run dev
 ```
+
+または
+
+```bash
+pnpm --filter my-video1 dev
+```
+
 別のターミナルで、サーバーのURLを使用してビデオをレンダリングします：
 ```bash
-open-motion render -u http://localhost:5173 -o out.mp4
+open-motion render -u http://localhost:5173 -o out.mp4 --composition my-video1
 ```
 
 ## 💻 CLI リファレンス
@@ -92,17 +130,38 @@ open-motion render -u http://localhost:5173 -o out.mp4
 ### `open-motion init <name>`
 事前設定されたReactテンプレートを使用して、新しいOpenMotionプロジェクトを初期化します。
 
+### `open-motion generate <description>`
+LLMを使用してテキスト記述からビデオシーンとコードを自動生成します。
+
+| オプション | 説明 |
+| :--- | :--- |
+| `--env <path>` | .envファイルのパス (デフォルト: カレントディレクトリの .env) |
+| `--scenes <number>` | 生成するシーン数 |
+| `--fps <number>` | フレームレート (デフォルト: 30) |
+| `--width <number>` | ビデオ幅 (デフォルト: 1280) |
+| `--height <number>` | ビデオ高さ (デフォルト: 720) |
+
+### `open-motion edit <file>`
+自然言語の指示を使用してTSXシーンファイルを編集します。
+
+| オプション | 説明 |
+| :--- | :--- |
+| `--env <path>` | .envファイルのパス (デフォルト: カレントディレクトリの .env) |
+| `-m, --message <msg>` | 編集指示 |
+| `-y, --yes` | 変更を自動適用 (ワンショットモード) |
+
 ### `open-motion config`
-LLMの設定（APIキー、モデルなど）を管理します。
+LLMプロバイダーの設定（APIキー、モデル）を管理します。
 
 - `open-motion config list`
 - `open-motion config get <VAR>`
 
-設定は環境変数から読み込まれます（プロジェクト直下の `.env` に置けます）：
+LLM設定は環境変数から読み込まれます（プロジェクトローカルの `.env` ファイルに記述できます）：
 
 ```bash
 # .env
 OPEN_MOTION_PROVIDER=openai
+OPEN_MOTION_MODEL=gpt-5.1
 OPENAI_API_KEY=sk-...
 ```
 

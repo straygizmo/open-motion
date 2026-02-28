@@ -24,8 +24,6 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface GenerateOptions {
-  provider?: string;
-  model?: string;
   apiKey?: string;
   baseURL?: string;
   scenes?: number;
@@ -421,13 +419,22 @@ function updateMainTsx(
 // Main command
 // ---------------------------------------------------------------------------
 
+function envInt(key: string): number | undefined {
+  const v = process.env[key];
+  if (v && v.trim() !== '') {
+    const n = parseInt(v.trim(), 10);
+    return Number.isNaN(n) ? undefined : n;
+  }
+  return undefined;
+}
+
 export async function runGenerate(
   description: string,
   options: GenerateOptions
 ): Promise<void> {
-  const fps = options.fps ?? 30;
-  const width = options.width ?? 1280;
-  const height = options.height ?? 720;
+  const fps = options.fps ?? envInt('VIDEO_FPS') ?? 30;
+  const width = options.width ?? envInt('VIDEO_WIDTH') ?? 1280;
+  const height = options.height ?? envInt('VIDEO_HEIGHT') ?? 720;
 
   // Resolve output directory (default: src/scenes relative to cwd)
   const outputDir = options.output
@@ -443,8 +450,6 @@ export async function runGenerate(
   // 1. Resolve & validate LLM config
   // ------------------------------------------------------------------
   const configOverrides: CliConfigOverrides = {
-    provider: options.provider,
-    model: options.model,
     apiKey: options.apiKey,
     baseURL: options.baseURL,
   };

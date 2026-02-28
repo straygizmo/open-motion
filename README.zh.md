@@ -31,6 +31,8 @@ OpenMotion 是 Remotion 的高性能开源替代方案。它允许你使用熟�
 ## ✨ 特性
 
 - ⚛️ **React 优先**: 充分利用 React 生态系统的全部力量。
+- 🤖 **AI 驱动生成**: 使用 LLM 从文本描述创建完整视频。
+- ✍️ **AI 辅助编辑**: 使用自然语言编辑 TSX 场景。
 - ⏱️ **帧准确的确定性**: 先进的时间劫持技术确保每一帧都完全一致。
 - 🚀 **并行渲染**: 通过利用所有 CPU 核心来提升渲染速度。
 - 🎵 **多轨音频混合**: 支持多个 `<Audio />` 且具有独立音量控制。
@@ -57,6 +59,30 @@ OpenMotion 是 Remotion 的高性能开源替代方案。它允许你使用熟�
 npm install @open-motion/core @open-motion/components
 ```
 
+## 🔧 从源码构建
+
+从源码构建需要 [Node.js](https://nodejs.org/) 和 [pnpm](https://pnpm.io/)。
+
+```bash
+git clone https://github.com/jsongo/open-motion.git
+cd open-motion
+pnpm install
+pnpm build
+```
+
+### Windows: 设置 pnpm 全局链接
+
+如果要在 Windows 上使用 `pnpm link --global`，可能需要先设置全局 bin 目录：
+
+```powershell
+$env:PNPM_HOME = "C:\Users\<YourUser>\AppData\Local\pnpm"
+$env:PATH += ";$env:PNPM_HOME"
+cd packages/cli
+pnpm link --global
+```
+
+或者运行 `pnpm setup` 并重启终端以自动应用环境变量。
+
 ## 🚀 快速开始
 
 ### 1. 设置
@@ -66,20 +92,37 @@ pnpm install -g @open-motion/cli @open-motion/renderer
 npx playwright install chromium
 ```
 
+如果在 Linux 无头环境中日文/中文/韩文显示为方块，通常是因为缺少系统字体。可以安装 CJK 字体（推荐）或在渲染时加载本地字体。
+
+- 安装系统字体 (Ubuntu/Debian): `sudo apt-get update && sudo apt-get install -y fonts-noto-cjk`
+- 或加载本地字体文件: `open-motion render ... --font "Noto Sans JP=./public/fonts/NotoSansJP-Regular.woff2"`
+
 ### 2. 创建项目
 ```bash
-open-motion init my-video
-cd my-video && pnpm install
+mkdir -p my_videos && cd my_videos
+open-motion init my-video1
+cd ../..  # 返回 monorepo 根目录
+pnpm install
 ```
 
 ### 3. 开发与渲染
+
 在一个终端中启动开发服务器：
+
 ```bash
+cd my_videos/my-video1
 pnpm run dev
 ```
+
+或
+
+```bash
+pnpm --filter my-video1 dev
+```
+
 在另一个终端中，使用服务器 URL 渲染视频：
 ```bash
-open-motion render -u http://localhost:5173 -o out.mp4
+open-motion render -u http://localhost:5173 -o out.mp4 --composition my-video1
 ```
 
 ## 💻 CLI 参考
@@ -87,17 +130,38 @@ open-motion render -u http://localhost:5173 -o out.mp4
 ### `open-motion init <name>`
 使用预配置的 React 模板初始化一个新的 OpenMotion 项目。
 
+### `open-motion generate <description>`
+使用 LLM 从文本描述自动生成视频场景和代码。
+
+| 选项 | 描述 |
+| :--- | :--- |
+| `--env <path>` | .env 文件路径 (默认: 当前目录下的 .env) |
+| `--scenes <number>` | 要生成的场景数量 |
+| `--fps <number>` | 每秒帧数 (默认: 30) |
+| `--width <number>` | 视频宽度 (默认: 1280) |
+| `--height <number>` | 视频高度 (默认: 720) |
+
+### `open-motion edit <file>`
+使用自然语言指令编辑 TSX 场景文件。
+
+| 选项 | 描述 |
+| :--- | :--- |
+| `--env <path>` | .env 文件路径 (默认: 当前目录下的 .env) |
+| `-m, --message <msg>` | 编辑指令 |
+| `-y, --yes` | 自动应用更改 (一次性模式) |
+
 ### `open-motion config`
-管理 LLM 配置（API Key、模型等）。
+管理 LLM 提供商设置（API 密钥、模型）。
 
 - `open-motion config list`
 - `open-motion config get <VAR>`
 
-配置从环境变量读取（也支持放在项目目录下的 `.env` 文件中）：
+LLM 设置从环境变量读取（可以放在项目本地的 `.env` 文件中）：
 
 ```bash
 # .env
 OPEN_MOTION_PROVIDER=openai
+OPEN_MOTION_MODEL=gpt-5.1
 OPENAI_API_KEY=sk-...
 ```
 
@@ -119,6 +183,19 @@ OPENAI_API_KEY=sk-...
 | `--public-dir <path>` | 静态资源的公共目录 (默认: `./public`) |
 | `--chromium-path <path>`| 自定义 Chromium 可执行文件路径 |
 | `--timeout <number>` | 浏览器操作超时时间 (毫秒) |
+| `--font <spec>` | 加载本地字体文件用于渲染 (可重复指定)。格式: `Family=path` 或 `path` |
+| `--bgm <path>` | 从本地 MP3 文件添加背景音乐 |
+| `--bgm-volume <number>` | BGM 音量 (0.0-1.0, 默认: 1.0) |
+
+示例 (渲染时添加 BGM):
+
+```bash
+open-motion render -u http://localhost:5173 -o out.mp4 --bgm ./music/bgm.mp3 --bgm-volume 0.5
+```
+
+注意:
+- 如果 BGM 比视频短，它会循环播放以覆盖整个时长。
+- 如果 BGM 比视频长，它会被裁剪到视频时长。
 
 ## 📚 API 参考
 

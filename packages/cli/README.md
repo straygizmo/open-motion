@@ -44,6 +44,7 @@ open-motion init my-video
 # Configure via environment variables (project-local .env supported)
 # .env
 OPEN_MOTION_PROVIDER=openai
+OPEN_MOTION_MODEL=gpt-4o
 OPENAI_API_KEY=sk-...
 
 # Verify what the CLI sees
@@ -53,7 +54,11 @@ open-motion config get OPENAI_API_KEY
 
 ### Generate a video from description
 ```bash
+# Uses .env in current directory by default
 open-motion generate "Explain how React hooks work"
+
+# Or specify a custom .env file
+open-motion generate "Explain how React hooks work" --env .env.anthropic
 ```
 
 ### Edit a scene file
@@ -63,6 +68,9 @@ open-motion edit src/scenes/IntroScene.tsx
 
 # One-shot mode
 open-motion edit src/scenes/IntroScene.tsx -m "Make the text color blue" --yes
+
+# Use a custom .env file
+open-motion edit src/scenes/IntroScene.tsx -m "Make the text color blue" --env .env.anthropic --yes
 ```
 
 ### Render a video

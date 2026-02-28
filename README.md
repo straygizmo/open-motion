@@ -135,8 +135,7 @@ Automatically generate video scenes and code from a text description using an LL
 
 | Option | Description |
 | :--- | :--- |
-| `--provider <name>` | LLM provider (`openai`, `anthropic`, `google`, `openrouter`, `ollama`, `openai-compatible`) |
-| `--model <name>` | Model name (e.g., `gpt-5.2`, `claude-4-6-sonnet`) |
+| `--env <path>` | Path to .env file (default: .env in current directory) |
 | `--scenes <number>` | Number of scenes to generate |
 | `--fps <number>` | Frames per second (default: 30) |
 | `--width <number>` | Video width (default: 1280) |
@@ -147,6 +146,7 @@ Edit a TSX scene file using natural language instructions.
 
 | Option | Description |
 | :--- | :--- |
+| `--env <path>` | Path to .env file (default: .env in current directory) |
 | `-m, --message <msg>` | Instruction for editing |
 | `-y, --yes` | Auto-apply changes (one-shot mode) |
 
@@ -161,6 +161,7 @@ LLM settings are read from environment variables (you can put them in a project-
 ```bash
 # .env
 OPEN_MOTION_PROVIDER=openai
+OPEN_MOTION_MODEL=gpt-5.1
 OPENAI_API_KEY=sk-...
 ```
 

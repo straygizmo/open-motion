@@ -640,12 +640,8 @@ Examples:
   const generateCommand = program
     .command('generate <description>')
     .description('Auto-generate video scene TSX files using an LLM')
-    .option(
-      '--provider <name>',
-      'LLM provider (openai/openrouter/anthropic/google/ollama/openai-compatible)'
-    )
-    .option('--model <name>', 'Model name to use')
-    .option('--api-key <key>', 'API key (overrides config file and environment variables)')
+    .option('--env <path>', 'Path to .env file (default: .env in current directory)')
+    .option('--api-key <key>', 'API key (overrides environment variables)')
     .option('--base-url <url>', 'Base URL (for openrouter / openai-compatible / ollama)')
     .option('--scenes <number>', 'Number of scenes to generate (default: decided by LLM)', parseInt)
     .option('--fps <number>', 'Frame rate (default: 30)', parseInt)
@@ -655,8 +651,6 @@ Examples:
     .action(async (description: string, options) => {
       try {
         await runGenerate(description, {
-          provider: options.provider,
-          model: options.model,
           apiKey: options.apiKey,
           baseURL: options.baseUrl,
           scenes: options.scenes,
@@ -675,14 +669,13 @@ Examples:
 Examples:
   $ open-motion generate "A video explaining the React lifecycle"
   $ open-motion generate "TypeScript type system explainer" --scenes 4 --fps 30
-  $ open-motion generate "How to use AWS S3" --provider anthropic --model claude-opus-4-5
-  $ open-motion generate "React hooks overview" --provider openrouter --model openai/gpt-4o
-  $ open-motion generate "How Docker works" --provider ollama --model llama3
-  $ open-motion generate "CI/CD pipeline explainer" --provider openai-compatible --base-url https://example.com/v1
   $ open-motion generate "CI/CD pipeline explainer" --width 1920 --height 1080
+  $ open-motion generate "How Docker works" --env .env.ollama
 
 Note:
-  - LLM configuration is read from environment variables (you can put them in a .env file)
+  - LLM configuration is read from environment variables
+  - By default, .env in the current directory is loaded
+  - Use --env to specify a custom .env file path
   - Run this command from the root of an existing project (created with open-motion init)
 `);
 
@@ -693,20 +686,14 @@ Note:
     .command('edit <file>')
     .description('Interactively edit a TSX scene file using an LLM')
     .option('-m, --message <instruction>', 'One-shot mode: pass instruction as a string')
-    .option(
-      '--provider <name>',
-      'LLM provider (openai/openrouter/anthropic/google/ollama/openai-compatible)'
-    )
-    .option('--model <name>', 'Model name to use')
-    .option('--api-key <key>', 'API key (overrides config file and environment variables)')
+    .option('--env <path>', 'Path to .env file (default: .env in current directory)')
+    .option('--api-key <key>', 'API key (overrides environment variables)')
     .option('--base-url <url>', 'Base URL (for openrouter / openai-compatible / ollama)')
     .option('-y, --yes', 'Auto-apply changes without confirmation (one-shot mode only)')
     .action(async (file: string, options) => {
       try {
         await runEdit(file, {
           message: options.message,
-          provider: options.provider,
-          model: options.model,
           apiKey: options.apiKey,
           baseURL: options.baseUrl,
           yes: options.yes,
@@ -725,9 +712,7 @@ Examples:
   # One-shot mode (pass a single instruction)
   $ open-motion edit src/scenes/IntroScene.tsx --message "Change the background to blue"
   $ open-motion edit src/scenes/IntroScene.tsx -m "Make the text larger" --yes
-
-  # Specify a provider
-  $ open-motion edit src/scenes/IntroScene.tsx --provider anthropic -m "Smooth out the animation"
+  $ open-motion edit src/scenes/IntroScene.tsx -m "Smooth out the animation" --env .env.anthropic
 `);
 
   // ---------------------------------------------------------------------------
