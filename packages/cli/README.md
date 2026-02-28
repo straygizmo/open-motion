@@ -19,6 +19,19 @@ npm install -g @open-motion/cli
 npx @open-motion/cli --help
 ```
 
+### Windows: Setting up pnpm global link
+
+If you're building from source and using `pnpm link --global` on Windows, you may need to set up the global bin directory first:
+
+```powershell
+$env:PNPM_HOME = "C:\Users\<YourUser>\AppData\Local\pnpm"
+$env:PATH += ";$env:PNPM_HOME"
+cd packages/cli
+pnpm link --global
+```
+
+Alternatively, run `pnpm setup` and restart your terminal to apply the environment variables automatically.
+
 ## 📖 Usage
 
 ### Initialize a project

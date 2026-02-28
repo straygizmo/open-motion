@@ -70,6 +70,19 @@ pnpm install
 pnpm build
 ```
 
+### Windows: Setting up pnpm global link
+
+If you want to use `pnpm link --global` on Windows, you may need to set up the global bin directory first:
+
+```powershell
+$env:PNPM_HOME = "C:\Users\<YourUser>\AppData\Local\pnpm"
+$env:PATH += ";$env:PNPM_HOME"
+cd packages/cli
+pnpm link --global
+```
+
+Alternatively, run `pnpm setup` and restart your terminal to apply the environment variables automatically.
+
 ## 🚀 Quick Start
 
 ### 1. Setup
