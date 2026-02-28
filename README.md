@@ -99,18 +99,30 @@ If Japanese/Chinese/Korean text renders as squares in headless Linux, it's usual
 
 ### 2. Create Project
 ```bash
-open-motion init my-video
-cd my-video && pnpm install
+mkdir -p my_videos && cd my_videos
+open-motion init my-video1
+cd ../..  # Return to monorepo root
+pnpm install
 ```
 
 ### 3. Develop & Render
+
 Start the dev server in one terminal:
+
 ```bash
+cd my_videos/my-video1
 pnpm run dev
 ```
+
+or
+
+```bash
+pnpm --filter my-video1 dev
+```
+
 In another terminal, render your video using the server URL:
 ```bash
-open-motion render -u http://localhost:5173 -o out.mp4
+open-motion render -u http://localhost:5173 -o out.mp4 --composition my-video1
 ```
 
 ## 💻 CLI Reference
