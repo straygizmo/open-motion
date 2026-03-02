@@ -27,11 +27,40 @@ setTimeout, setInterval, or any real-time mechanism for animation.
   - Children are only rendered during frames [from, from+durationInFrames)
   - Inside Sequence, \`useCurrentFrame()\` returns a frame relative to \`from\`
 
+### Easing functions (import from '@open-motion/core')
+- \`Easing.linear\`, \`Easing.easeIn\`, \`Easing.easeOut\`, \`Easing.easeInOut\`
+- \`Easing.inOutCubic\`, \`Easing.outBack\`, \`Easing.inExpo\`, \`Easing.outExpo\`, and more
+- Example: \`interpolate(frame, [0, 30], [0, 100], { easing: Easing.outCubic })\`
+
+### Animation & Transitions (import from '@open-motion/components')
+- \`<Loop durationInFrames={n}>\` — Create looping time contexts for sub-animations
+  - Example: \`<Loop durationInFrames={60}><SpinningLogo /></Loop>\`
+- \`<Transition type="fade|wipe|slide|zoom" direction="left|right|up|down">\` — Smooth enter/exit transitions
+  - Example: \`<Transition type="wipe" direction="right"><Title /></Transition>\`
+
+### Media components (import from '@open-motion/core')
+- \`<Audio src="..." volume={0.5} startFrom={n} startFrame={n} />\` — Multi-track audio with independent volume and timing
+  - Example: \`<Audio src="/music.mp3" volume={0.5} startFrom={30} startFrame={60} />\`
+- \`<OffthreadVideo src="..." />\` — High-performance video decoding in background processes
+- \`getVideoMetadata(url)\` — Fetch video dimensions and duration (async)
+  - Example: \`const { width, height, durationInSeconds } = await getVideoMetadata('/video.mp4');\`
+- \`parseSrt(srtContent)\` — Convert SRT subtitle files to arrays
+  - Example: \`const subtitles = parseSrt(await fetch('/subtitles.srt').then(r => r.text()));\`
+
+### Caption components (import from '@open-motion/components')
+- \`<Captions subtitles={subtitles} color="white" fontSize={24} />\` — Flexible subtitle renderer with styling options
+- \`<TikTokCaption />\` — Pre-styled component for TikTok-like animated captions
+
+### 3D & Lottie (import from '@open-motion/components')
+- \`<ThreeCanvas />\` — Render Three.js scenes synced with video frames
+- \`<Lottie url="..." />\` — Declarative Lottie animations with frame-accurate control
+  - Example: \`<Lottie url="/animations/logo.json" />\`
+
 ## Coding rules
 1. Export the component as a **named export** (not default)
 2. All styles must be **inline React styles** (no CSS files, no styled-components)
 3. The root element MUST fill the full \`width\` and \`height\` from \`useVideoConfig()\`
-4. Never import anything outside of \`react\` and \`@open-motion/core\`
+4. Never import anything outside of \`react\`, \`@open-motion/core\`, and \`@open-motion/components\`
 5. Do NOT add \`<Composition>\` registration inside scene files — that belongs in main.tsx
 6. The component must be **completely self-contained** with no props required
 7. Use visually appealing designs: thoughtful colors, smooth animations, readable typography

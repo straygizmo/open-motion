@@ -34,7 +34,7 @@ export const runInit = async (projectName: string) => {
   console.log(`Initializing OpenMotion project: ${projectName} using ${pm}...`);
 
   // Basic template structure
-  const dirs = ['', 'src'];
+  const dirs = ['', 'src', 'public', 'public/audio'];
   for (const dir of dirs) {
     fs.mkdirSync(path.join(targetDir, dir), { recursive: true });
   }
@@ -648,6 +648,8 @@ Examples:
     .option('--width <number>', 'Video width (default: 1280)', parseInt)
     .option('--height <number>', 'Video height (default: 720)', parseInt)
     .option('--output <dir>', 'Output directory for scene files (default: src/scenes)')
+    .option('--bgm <path>', 'Path to BGM audio file (MP3/WAV)')
+    .option('--bgm-volume <number>', 'BGM volume (0.0-1.0, default: 0.5)', parseFloat)
     .action(async (description: string, options) => {
       try {
         await runGenerate(description, {
@@ -658,6 +660,8 @@ Examples:
           width: options.width,
           height: options.height,
           output: options.output,
+          bgm: options.bgm,
+          bgmVolume: options.bgmVolume,
         });
       } catch (err) {
         console.error('Generate failed:', err);

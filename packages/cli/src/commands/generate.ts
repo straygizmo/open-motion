@@ -31,6 +31,8 @@ export interface GenerateOptions {
   width?: number;
   height?: number;
   output?: string;
+  bgm?: string;
+  bgmVolume?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +177,9 @@ function buildCompositionFile(
   fps: number,
   width: number,
   height: number,
-  srtContent: string
+  srtContent: string,
+  bgmSrc?: string,
+  bgmVolume?: number
 ): string {
   const imports = plan.scenes
     .map((s) => `import { ${s.componentName} } from './scenes/${s.componentName}';`)
@@ -197,6 +201,11 @@ function buildCompositionFile(
   // Use JSON string escaping so we can embed arbitrary caption text safely.
   const srtLiteral = JSON.stringify(srtContent);
 
+  // BGM audio element
+  const bgmAudio = bgmSrc 
+    ? `    <Audio src="${bgmSrc}" volume={${bgmVolume ?? 0.5}} />`
+    : '';
+
   return `import React, { useMemo } from 'react';
  import {
    Sequence,
@@ -205,6 +214,7 @@ function buildCompositionFile(
    interpolate,
    spring,
    parseSrt,
+   Audio,
    type SubtitleItem,
  } from '@open-motion/core';
  ${imports}
@@ -212,15 +222,15 @@ function buildCompositionFile(
  /** Auto-generated composition: ${videoTitle} */
  const SRT_CAPTIONS: string = ${srtLiteral};
 
-  const CaptionOverlay: React.FC<{ subtitles: SubtitleItem[] }> = ({ subtitles }) => {
-    const frame = useCurrentFrame();
-    const { fps } = useVideoConfig();
-    const currentTime = frame / fps;
+ const CaptionOverlay: React.FC<{ subtitles: SubtitleItem[] }> = ({ subtitles }) => {
+   const frame = useCurrentFrame();
+   const { fps } = useVideoConfig();
+   const currentTime = frame / fps;
 
-    const active = subtitles.find(
-      (s) => currentTime >= s.startInSeconds && currentTime < s.endInSeconds
-    );
-    if (!active) return null;
+   const active = subtitles.find(
+     (s) => currentTime >= s.startInSeconds && currentTime < s.endInSeconds
+   );
+   if (!active) return null;
 
    const startFrame = Math.round(active.startInSeconds * fps);
    const relFrame = Math.max(0, frame - startFrame);
@@ -229,21 +239,21 @@ function buildCompositionFile(
    const opacity = interpolate(enter, [0, 1], [0, 1], { extrapolateRight: 'clamp' });
    const scale = interpolate(enter, [0, 1], [0.96, 1], { extrapolateRight: 'clamp' });
 
-    // Simple TikTok-ish word highlight sweep.
-    // Sweep exactly once across the whole subtitle block (no looping).
-    const words = active.text.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
-    const displayedWords = words.length > 0 ? words : [active.text];
-    const blockDurationInFrames = Math.max(
-      1,
-      Math.round((active.endInSeconds - active.startInSeconds) * fps)
-    );
-    const sweep = interpolate(
-      relFrame,
-      [0, blockDurationInFrames],
-      [0, displayedWords.length],
-      { extrapolateRight: 'clamp' }
-    );
-    const highlightIndex = Math.min(displayedWords.length - 1, Math.floor(sweep));
+   // Simple TikTok-ish word highlight sweep.
+   // Sweep exactly once across the whole subtitle block (no looping).
+   const words = active.text.replace(/\\s+/g, ' ').trim().split(' ').filter(Boolean);
+   const displayedWords = words.length > 0 ? words : [active.text];
+   const blockDurationInFrames = Math.max(
+     1,
+     Math.round((active.endInSeconds - active.startInSeconds) * fps)
+   );
+   const sweep = interpolate(
+     relFrame,
+     [0, blockDurationInFrames],
+     [0, displayedWords.length],
+     { extrapolateRight: 'clamp' }
+   );
+   const highlightIndex = Math.min(displayedWords.length - 1, Math.floor(sweep));
 
    return (
      <div
@@ -254,12 +264,12 @@ function buildCompositionFile(
          bottom: 72,
          display: 'flex',
          justifyContent: 'center',
-          padding: '0 48px',
-          pointerEvents: 'none',
-          opacity,
-          transform: \`scale(\${scale})\`,
-        }}
-      >
+         padding: '0 48px',
+         pointerEvents: 'none',
+         opacity,
+         transform: \`scale(\${scale})\`,
+       }}
+     >
        <div
          style={{
            maxWidth: '92%',
@@ -280,20 +290,20 @@ function buildCompositionFile(
            gap: 12,
          }}
        >
-          {displayedWords.map((w, i) => (
-            <span
-              key={i}
-              style={{
-                padding: '2px 10px',
-                borderRadius: 10,
-                backgroundColor: highlightIndex === i ? '#ff0050' : 'transparent',
-                transform: highlightIndex === i ? 'scale(1.06)' : 'scale(1)',
-                transition: 'transform 80ms linear',
-              }}
-            >
-              {w}
-            </span>
-          ))}
+         {displayedWords.map((w, i) => (
+           <span
+             key={i}
+             style={{
+               padding: '2px 10px',
+               borderRadius: 10,
+               backgroundColor: highlightIndex === i ? '#ff0050' : 'transparent',
+               transform: highlightIndex === i ? 'scale(1.06)' : 'scale(1)',
+               transition: 'transform 80ms linear',
+             }}
+           >
+             {w}
+           </span>
+         ))}
        </div>
      </div>
    );
@@ -306,19 +316,20 @@ function buildCompositionFile(
      <div style={{ width, height, overflow: 'hidden', backgroundColor: '#000', position: 'relative' }}>
  ${sequences}
        <CaptionOverlay subtitles={subtitles} />
+ ${bgmAudio}
      </div>
    );
  };
 
-/** Total duration in frames: ${totalFrames} (${(totalFrames / fps).toFixed(1)}s at ${fps}fps) */
-export const ${componentName}Config = {
-  id: '${componentName.replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))}',
-  component: ${componentName},
-  width: ${width},
-  height: ${height},
-  fps: ${fps},
-  durationInFrames: ${totalFrames},
-} as const;
+ /** Total duration in frames: ${totalFrames} (${(totalFrames / fps).toFixed(1)}s at ${fps}fps) */
+ export const ${componentName}Config = {
+   id: '${componentName.replace(/([A-Z])/g, (m, l, i) => (i === 0 ? l.toLowerCase() : '-' + l.toLowerCase()))}',
+   component: ${componentName},
+   width: ${width},
+   height: ${height},
+   fps: ${fps},
+   durationInFrames: ${totalFrames},
+ } as const;
  `;
 }
 
@@ -681,11 +692,37 @@ export async function runGenerate(
   console.log('');
 
   // ------------------------------------------------------------------
-  // 5. Generate composition wrapper
+  // 5. Handle BGM
+  // ------------------------------------------------------------------
+  let bgmSrc: string | undefined;
+  if (options.bgm) {
+    const bgmPath = path.resolve(process.cwd(), options.bgm);
+
+    if (!fs.existsSync(bgmPath)) {
+      console.error(chalk.red(`BGM file not found: ${bgmPath}`));
+      process.exit(1);
+    }
+
+    // Create public/audio/bgm directory and copy BGM file
+    const publicDir = path.join(process.cwd(), 'public');
+    const audioDir = path.join(publicDir, 'audio', 'bgm');
+    fs.mkdirSync(audioDir, { recursive: true });
+
+    const bgmFileName = path.basename(bgmPath);
+    const destPath = path.join(audioDir, bgmFileName);
+    fs.copyFileSync(bgmPath, destPath);
+
+    bgmSrc = `/audio/bgm/${bgmFileName}`;
+    console.log(chalk.dim(`BGM copied to: public/audio/bgm/${bgmFileName}`));
+    console.log('');
+  }
+
+  // ------------------------------------------------------------------
+  // 6. Generate composition wrapper
   // ------------------------------------------------------------------
   spinner.start('[4/4] Generating composition file...');
 
-  const compositionCode = buildCompositionFile(plan.videoTitle, plan, fps, width, height, srtContent);
+  const compositionCode = buildCompositionFile(plan.videoTitle, plan, fps, width, height, srtContent, bgmSrc, options.bgmVolume);
   const compositionComponentName = toPascalCase(plan.videoTitle) + 'Video';
 
   // Total duration for the composition
@@ -716,7 +753,7 @@ export async function runGenerate(
   console.log('');
 
   // ------------------------------------------------------------------
-  // 5. Summary
+  // 7. Summary
   // ------------------------------------------------------------------
   console.log(chalk.bold.green('Done!'));
   console.log('');
@@ -730,6 +767,9 @@ export async function runGenerate(
   if (updatedMainTsx) {
     const relMain = path.relative(process.cwd(), mainTsxPath);
     console.log(chalk.green('  ✓') + '  ' + relMain + chalk.dim('  (Composition appended)'));
+  }
+  if (bgmSrc) {
+    console.log(chalk.green('  ✓') + '  public/audio/bgm/' + path.basename(bgmSrc) + chalk.dim('  (BGM)'));
   }
   console.log('');
   console.log(
